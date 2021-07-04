@@ -170,7 +170,7 @@ getDirectories('./plugins').toString().split(',').forEach(element=>{
             
             // Map the plugin's main class
             camellib.mappedClasses.set(element+"/"+tempManifest.class,new tempObject(new mappedClass(tempLogger,camellib)));
-            camellib.plugins.set(tempManifest.name,new plugClass(camellib.mappedClasses.get(element+"/"+tempManifest.class),[],tempManifest.name,tempManifest.description));
+            camellib.plugins.set(tempManifest.name,new plugClass(camellib.mappedClasses.get(element+"/"+tempManifest.class),[],tempManifest));
             tempManifest.commands.forEach(command=>{
                 // Load the command's class
                 let tempObject = require('./plugins/'+element+"/"+command.class)
