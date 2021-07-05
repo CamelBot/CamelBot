@@ -1,31 +1,22 @@
 // General Library for all plugins to tap into. Yay, classes
 // jkcoxson
 
-
 const { EventEmitter } = require('events');
-const { resolve } = require('path');
-const fs = require('fs')
+const fs = require('fs');
 const coreLibjs = require('./coreCommands');
-const { Client, DiscordAPIError } = require('discord.js');
-const winston = require('winston');
-const discord = require('discord.js');
-const plugClass = require('./plugClass');
-const mappedClass = require('./mappedClass');
-const mappedCommands = require('./command');
-const command = require('./command');
 
 module.exports = class camellib extends EventEmitter {
-    constructor(parameters){
+    constructor(parameters) {
         super();
-        this.private=parameters.private;
+        this.private = parameters.private;
         this.database = new Map();
         this.plugins = new Map();
         this.mappedClasses = new Map();
         this.mappedCommands = new Map();
-        parameters.database.forEach(guild=>{
-            this.database.set(guild.id,guild)
-        })
-        this.saveDatabase()
+        parameters.database.forEach(guild => {
+            this.database.set(guild.id, guild);
+        });
+        this.saveDatabase();
     }
     /**@type {Object} Stores the private JSON that contains environment specific data*/
     private;
@@ -43,107 +34,107 @@ module.exports = class camellib extends EventEmitter {
     mappedCommands;
     /**@type {coreLibjs} A class for the core commands of CamelBot*/
     coreLib = new coreLibjs({
-        "logger":this.logger,
-        "camellib":this
+        'logger': this.logger,
+        'camellib': this
     });
     /**@type {Array<Object>} Basically the manifest for the core commands so they can be loaded by the normal loader */
     coreCommands = [
         {
-            "name":"help",
-            "description":"Get help using CamelBot",
-            "class":"coreCommands.js",
-            "method":"help",
-            "source":[
-                "discord",
-                "minecraft"
+            'name': 'help',
+            'description': 'Get help using CamelBot',
+            'class': 'coreCommands.js',
+            'method': 'help',
+            'source': [
+                'discord',
+                'minecraft'
             ],
-            "options":[]
+            'options': []
         },
         {
-            "name":"plugins",
-            "description":"Turn on or off a command",
-            "class":"coreCommands.js",
-            "method":"pluginCommand",
-            "source":[
-                "discord",
-                "minecraft"
+            'name': 'plugins',
+            'description': 'Turn on or off a command',
+            'class': 'coreCommands.js',
+            'method': 'pluginCommand',
+            'source': [
+                'discord',
+                'minecraft'
             ],
-            "options":[]
+            'options': []
         }
     ]
     /**
      * Adds them to the map since they weren't loaded by the manifest loader
      */
-    mapCoreCommands(){
-        this.mappedClasses.set("core/coreCommands.js",this.coreLib)
-        this.coreCommands.forEach(command=>{
+    mapCoreCommands() {
+        this.mappedClasses.set('core/coreCommands.js', this.coreLib);
+        this.coreCommands.forEach(command => {
             this.mappedCommands.set(command.name, {
-                "manifest":command,
-                "method":this.coreLib[command.method],
-                "plugin":"core"
-            })
-        })
-        this.coreLib.initClient(this.client)
+                'manifest': command,
+                'method': this.coreLib[command.method],
+                'plugin': 'core'
+            });
+        });
+        this.coreLib.initClient(this.client);
     }
 
     /**
      * Initiates commands if they aren't already created. IF THEY ALREADY EXIST THEY WILL NOT BE OVERWRITTEN
      */
-    publishCommands(){
-        this.database.forEach(guild=>{
-            this.mappedCommands.forEach(command=>{
-                if((command.plugin=="core"||guild.enabledPlugins.includes(command.plugin))&&command.manifest.source.includes('discord')){
-                    this.client.guilds.cache.get(guild.id).commands.fetch().then(()=>{
-                        if(!this.client.guilds.cache.get(guild.id).commands.cache.find(element => element.name==command.manifest.name)){
+    publishCommands() {
+        this.database.forEach(guild => {
+            this.mappedCommands.forEach(command => {
+                if ((command.plugin == 'core' || guild.enabledPlugins.includes(command.plugin)) && command.manifest.source.includes('discord')) {
+                    this.client.guilds.cache.get(guild.id).commands.fetch().then(() => {
+                        if (!this.client.guilds.cache.get(guild.id).commands.cache.find(element => element.name == command.manifest.name)) {
                             this.client.guilds.cache.get(guild.id).commands.create({
                                 name: command.manifest.name,
                                 description: command.manifest.description,
                                 options: command.manifest.options
-                            })
+                            });
                             // If plugins want to edit functions, they can know that it exists now
-                            this.emit("commandCreated",(guild.id,command.manifest.name))
+                            this.emit('commandCreated', (guild.id, command.manifest.name));
                         }
-                    })
+                    });
                 }
-            })
-        })
-        
+            });
+        });
+
     }
 
     /**
      * Gets rid of the commands that are in the Discord server but shouldn't be
      */
-    purgeCommands(){
-        this.database.forEach(guild=>{
-            this.client.guilds.cache.get(guild.id).commands.fetch().then(()=>{
-                this.client.guilds.cache.get(guild.id).commands.cache.forEach(command=>{
+    purgeCommands() {
+        this.database.forEach(guild => {
+            this.client.guilds.cache.get(guild.id).commands.fetch().then(() => {
+                this.client.guilds.cache.get(guild.id).commands.cache.forEach(command => {
                     let found = false;
-                    this.mappedCommands.forEach(element=>{
-                        if(this.database.get(guild.id).enabledPlugins.includes(element.plugin)&&element.manifest.name==command.name){
+                    this.mappedCommands.forEach(element => {
+                        if (this.database.get(guild.id).enabledPlugins.includes(element.plugin) && element.manifest.name == command.name) {
                             found = true;
                         }
-                        if(element.plugin=="core"&&element.manifest.name==command.name){
+                        if (element.plugin == 'core' && element.manifest.name == command.name) {
                             found = true;
                         }
-                    })
-                    if(!found){
+                    });
+                    if (!found) {
                         command.delete();
-                        this.emit("commandDeleted",(guild.id,command.name))
+                        this.emit('commandDeleted', (guild.id, command.name));
                     }
-                })
-            })
-            
-        })
+                });
+            });
+
+        });
     }
     /**
      * Converts the database map back to a JSON and saves it
      */
-    async saveDatabase(){
-        let toSend = []
-        this.database.forEach(guild=>{
-            toSend.push(guild)
-        })
-        fs.writeFileSync('./configs/database.json',JSON.stringify(toSend, null, "\t"))
+    async saveDatabase() {
+        let toSend = [];
+        this.database.forEach(guild => {
+            toSend.push(guild);
+        });
+        fs.writeFileSync('./configs/database.json', JSON.stringify(toSend, null, '\t'));
     }
 
-}
+};

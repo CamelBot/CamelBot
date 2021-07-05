@@ -5,9 +5,9 @@
 
 module.exports = class command {
     constructor(manifest,method,plugin){
-        this.manifest=manifest
-        this.method=method
-        this.plugin=plugin
+        this.manifest=manifest;
+        this.method=method;
+        this.plugin=plugin;
     }
     /**@type {Object} The JSON object of the manifest*/
     manifest;
@@ -15,4 +15,4 @@ module.exports = class command {
     method;
     /**@type {String} The name of the plugin the command belongs to*/
     plugin;
-}
+};
