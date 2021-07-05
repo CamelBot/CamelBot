@@ -1,7 +1,9 @@
 // General Library for all plugins to tap into. Yay, classes
 // jkcoxson
 
-const { EventEmitter } = require('events');
+const {
+    EventEmitter
+} = require('events');
 const fs = require('fs');
 const coreLibjs = require('./coreCommands');
 
@@ -38,8 +40,7 @@ module.exports = class camellib extends EventEmitter {
         'camellib': this
     });
     /**@type {Array<Object>} Basically the manifest for the core commands so they can be loaded by the normal loader */
-    coreCommands = [
-        {
+    coreCommands = [{
             'name': 'help',
             'description': 'Get help using CamelBot',
             'class': 'coreCommands.js',

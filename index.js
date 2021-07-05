@@ -24,18 +24,27 @@ const logger = winston.createLogger({
         winston.format.timestamp({
             format: 'YYYY-MM-DD HH:mm:ss'
         }),
-        winston.format.errors({ stack: true }),
+        winston.format.errors({
+            stack: true
+        }),
         winston.format.splat(),
         winston.format.json()
     ),
-    defaultMeta: { service: 'CamelBot Core' },
+    defaultMeta: {
+        service: 'CamelBot Core'
+    },
     transports: [
         //
         // - Write to all logs with level `info` and below to `quick-start-combined.log`.
         // - Write all logs error (and below) to `quick-start-error.log`.
         //
-        new winston.transports.File({ filename: './logs/error.log', level: 'error' }),
-        new winston.transports.File({ filename: './logs/logger.log' })
+        new winston.transports.File({
+            filename: './logs/error.log',
+            level: 'error'
+        }),
+        new winston.transports.File({
+            filename: './logs/logger.log'
+        })
     ]
 });
 
@@ -51,7 +60,10 @@ logger.add(new winston.transports.Console({
 
 camellib.logger = logger;
 
-let client = new Discord.Client({ partials: ['MESSAGE', 'CHANNEL', 'REACTION'], intents: [Discord.Intents.FLAGS.GUILDS, Discord.Intents.FLAGS.GUILD_MESSAGES, Discord.Intents.FLAGS.GUILD_MEMBERS] });
+let client = new Discord.Client({
+    partials: ['MESSAGE', 'CHANNEL', 'REACTION'],
+    intents: [Discord.Intents.FLAGS.GUILDS, Discord.Intents.FLAGS.GUILD_MESSAGES, Discord.Intents.FLAGS.GUILD_MEMBERS]
+});
 
 // Log into the Discord API
 client.login(camellib.private.token).catch((error) => {
@@ -110,18 +122,27 @@ getDirectories('./plugins').toString().split(',').forEach(element => {
                     winston.format.timestamp({
                         format: 'YYYY-MM-DD HH:mm:ss'
                     }),
-                    winston.format.errors({ stack: true }),
+                    winston.format.errors({
+                        stack: true
+                    }),
                     winston.format.splat(),
                     winston.format.json()
                 ),
-                defaultMeta: { service: tempManifest.name },
+                defaultMeta: {
+                    service: tempManifest.name
+                },
                 transports: [
                     //
                     // - Write to all logs with level `info` and below to `quick-start-combined.log`.
                     // - Write all logs error (and below) to `quick-start-error.log`.
                     //
-                    new winston.transports.File({ filename: './logs/error.log', level: 'error' }),
-                    new winston.transports.File({ filename: './logs/logger.log' })
+                    new winston.transports.File({
+                        filename: './logs/error.log',
+                        level: 'error'
+                    }),
+                    new winston.transports.File({
+                        filename: './logs/logger.log'
+                    })
                 ]
             });
             tempLogger.add(new winston.transports.Console({
@@ -174,8 +195,7 @@ client.on('interaction', interaction => {
  * @returns {null} 
  */
 function getDirectories(path) {
-    return fs.readdirSync(path).filter(function (file) {
+    return fs.readdirSync(path).filter(function(file) {
         return fs.statSync(path + '/' + file).isDirectory();
     });
 }
-

@@ -1,4 +1,6 @@
-const { EventEmitter } = require('events');
+const {
+    EventEmitter
+} = require('events');
 const Discord = require('discord.js');
 
 /**@type {camelLibjs} */
@@ -37,7 +39,10 @@ module.exports = class plugin extends EventEmitter {
                             .setColor('#ff0000')
                             .setTimestamp()
                             .addField('Permission', 'You do not have permission to edit the server\'s plugins');
-                        interaction.reply({ embeds: [toSend], ephemeral: true });
+                        interaction.reply({
+                            embeds: [toSend],
+                            ephemeral: true
+                        });
                         return;
                     }
                     if (!Object.prototype.hasOwnProperty.call(buttonInteraction, 'button')) return;
@@ -57,7 +62,9 @@ module.exports = class plugin extends EventEmitter {
                             .setTitle(buttonInteraction.plugin + ' disabled')
                             .addField('Success', 'All commands and features are now disabled for your Discord Server')
                             .setTimestamp();
-                        interaction.reply({ embeds: [toSend] });
+                        interaction.reply({
+                            embeds: [toSend]
+                        });
                         return;
                     }
                     if (buttonInteraction.button == 'enable') {
@@ -75,7 +82,9 @@ module.exports = class plugin extends EventEmitter {
                             .setTitle(buttonInteraction.plugin + ' enabled')
                             .addField('Success', 'All commands and features are now active in your server')
                             .setTimestamp();
-                        interaction.reply({ embeds: [toSend] });
+                        interaction.reply({
+                            embeds: [toSend]
+                        });
                         return;
                     }
                 }
@@ -105,7 +114,9 @@ module.exports = class plugin extends EventEmitter {
                 .setTitle('**__Plugins__**')
                 .addField('Installed plugins', 'Below are all commands installed in CamelBot, enable or disable them here.')
                 .setColor(generateColor());
-            commandRunner.interaction.reply({ embeds: [toSend] });
+            commandRunner.interaction.reply({
+                embeds: [toSend]
+            });
             camellib.plugins.forEach(plugin => {
                 /**@type {plugClass} */
                 let thisplug = plugin;
@@ -119,29 +130,32 @@ module.exports = class plugin extends EventEmitter {
                 if (camellib.database.get(commandRunner.interaction.guild.id).enabledPlugins.includes(thisplug.name)) {
                     comp.addComponents(
                         new Discord.MessageButton()
-                            .setCustomID(JSON.stringify({
-                                'command': 'plugins',
-                                'plugin': thisplug.name,
-                                'button': 'disable'
-                            }))
-                            .setLabel('disable')
-                            .setStyle('DANGER')
+                        .setCustomID(JSON.stringify({
+                            'command': 'plugins',
+                            'plugin': thisplug.name,
+                            'button': 'disable'
+                        }))
+                        .setLabel('disable')
+                        .setStyle('DANGER')
                     );
                 } else {
                     comp.addComponents(
                         new Discord.MessageButton()
-                            .setCustomID(JSON.stringify({
-                                'command': 'plugins',
-                                'plugin': thisplug.name,
-                                'button': 'enable'
-                            }))
-                            .setLabel('enable')
-                            .setStyle('PRIMARY')
+                        .setCustomID(JSON.stringify({
+                            'command': 'plugins',
+                            'plugin': thisplug.name,
+                            'button': 'enable'
+                        }))
+                        .setLabel('enable')
+                        .setStyle('PRIMARY')
                     );
                 }
 
 
-                commandRunner.interaction.followUp({ embeds: [embed], components: [comp] });
+                commandRunner.interaction.followUp({
+                    embeds: [embed],
+                    components: [comp]
+                });
             });
 
 
