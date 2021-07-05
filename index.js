@@ -4,48 +4,6 @@
 
 console.log("System Startup, all hail camels")
 
-// Narcisism
-let splashScreen = "\n"+  
-"                               ./#%#########%%(,                                \n"+
-"                         .*////(#%#########%%%(////,                            \n"+
-"                       ,/#%%%%%##########%%&&&&%%%%#(/(/,                       \n"+
-"                    .*/#%%##############%%&&%%#######%%%#(*,                    \n"+
-"                    *#%%##%%%#####%%#####%%%#######%%%##%%#*                    \n"+
-"                    ,(###%&&%##%#(//(########%%%###%&&%###(*                    \n"+
-"                    *#%%%%%%%###/*,*(%%%%%%#((//(##%&&%%%%#*                    \n"+
-"                    .*(%&&%###(,...,*//////*,. .,/#%%&&&%(*.                    \n"+
-"                       *(#((#%%%####((/,,*/(#####%%#((((*                       \n"+
-"                    .,*,.  ,#@@&%##%@@%**#@@&##%&@@%*. .,*,.                    \n"+
-"                    *(%%#((#&@%.   *%@&##%@&/.  .(@@%(((%%#*                    \n"+
-"                    ,(%&&%%&@@&(/(&@@@@@@@@@@&#/(%@@&%%&&&#*                    \n"+
-"                    ,//*. .,(%&&&&%%%%#((#%%%%&&&&%(,. .*//,                    \n"+
-"                       .***,,,,..,,...*((/,..,,..,,,,***,                       \n"+
-"                      .*//*,,,**,**,**(#(/*,,*****,,,*//*.                      \n"+
-"                      .,//*,,,,,,,,,/(#((*,,,,,,,,,,,*//*.                      \n"+
-"                      .*//*,,,,,,***,,.,,,,,***,,,,,,*//*.                      \n"+
-"                      .,//*,,,,,,/((/******/((/*,,,,,*//*.                      \n"+
-"                         .*//,,,,,,,/(#((#(/*,,,,,,*/*.                         \n"+
-"                   ......,/(((/*****,,,,,,,,*****/(((/,......                   \n"+
-"            ..   *#@@@@@@@@@@@@@@@@&(*,,,,*(&@@@@@@@@@@@@@@@@%*.  ..            \n"+
-"         .(&@@@@@&%#############%%&&&&&&&&&&&&%%#############%&@@@@@@#,         \n"+
-"         .(@@@&&&&%#############%%&&&&&&&&&&&&%%#############%%&&&&@@#,         \n"+
-"         ,(@@&&%&%%#############%%%%%%%%%%%%%%%%#############%%&%%&@@#,         \n"+
-"    ,#@@@@@@@&&&&%%##########################################%%&&&&@@@@@@@%*    \n"+
-"    ./##(///((#####################################################(///(##(,    \n"+
-"    ./((/***/((((#%&%%####################################%%&%##(#(/***/((/,    \n"+
-"    ./##(/*/((#(##%&&%##%#################################%&&%##(#((/**/(#/,    \n"+
-"    ./((*,,,/(####%&&%####################################%%&%##(#(/*,,*((/,    \n"+
-"    ./((*,.,*(####%&%%####################################%&&%####(/,..*((/,    \n"+
-"    ./((*,.,/(####%&&&%%%#################################%%&%##(#(/,.,*((/,    \n"+
-"    ./((*,.,*(####%&&&&%%##%%##########################%%%&&&%####(/,..*((/,    \n"+
-"\n\n"+
-"                           ########################                             \n"+
-"                           ###     CamelBot     ###                             \n"+
-"                           ###   by jkcoxson    ###                             \n"+
-"                           ########################                             \n\n"
-
-console.log(splashScreen)
-
 const winston = require('winston');
 const Discord = require('discord.js')
 const camelLibjs = require('./camelLib');
@@ -61,7 +19,7 @@ const camellib = new camelLibjs({
     "database":require('./configs/database.json'),
 })
 
-
+// This is the main logger that core code uses
 const logger = winston.createLogger({
     level: 'info',
     format: winston.format.combine(
@@ -82,7 +40,8 @@ const logger = winston.createLogger({
         new winston.transports.File({ filename: './logs/logger.log' })
     ]
 });
-  
+
+// This logs to the console
 logger.add(new winston.transports.Console({
     format: winston.format.combine(
         winston.format.colorize(),
@@ -96,6 +55,7 @@ camellib.logger = logger
 
 let client = new Discord.Client({ partials: ['MESSAGE', 'CHANNEL', 'REACTION'], intents: [Discord.Intents.FLAGS.GUILDS, Discord.Intents.FLAGS.GUILD_MESSAGES,Discord.Intents.FLAGS.GUILD_MEMBERS] });
 
+// Log into the Discord API
 client.login(camellib.private.token).catch((error)=>{
     logger.error("Unable to initialize bot, check your key and connection.\n")
     logger.error(error)
@@ -104,8 +64,10 @@ client.login(camellib.private.token).catch((error)=>{
     
 });
 
+// Once Discord is ready
 client.on('ready',async ()=>{
     client.guilds.cache.forEach(guild=>{
+        // Create an entry in the database for each guild
         if(!camellib.database.has(guild.id)){
             camellib.database.set(guild.id,{
                 "id":guild.id,
@@ -122,9 +84,13 @@ client.on('ready',async ()=>{
             
         }
     })
+    // Save the database after a possible write
     camellib.saveDatabase();
+    // Map the commands for loading later
     camellib.mapCoreCommands();
+    // There may be unused commands in the API, remove them
     camellib.purgeCommands();
+    // Make sure that all commands are up to date on each guild
     camellib.publishCommands();
     
 })
@@ -139,7 +105,7 @@ getDirectories('./plugins').toString().split(',').forEach(element=>{
             let tempManifest = require('./plugins/'+element+"/manifest.json");
             // Load the class of the plugin
             let tempObject = require('./plugins/'+element+"/"+tempManifest.class)
-            // Create a logger for the plugin's class
+            // Create a logger for the plugin's class so we don't clog the main logger
             let tempLogger = winston.createLogger({
                 level: 'info',
                 format: winston.format.combine(
@@ -166,11 +132,12 @@ getDirectories('./plugins').toString().split(',').forEach(element=>{
                     winston.format.simple()
                 )
             }));
-            // Define an object for each plugin
             
             // Map the plugin's main class
             camellib.mappedClasses.set(element+"/"+tempManifest.class,new tempObject(new mappedClass(tempLogger,camellib)));
-            camellib.plugins.set(tempManifest.name,new plugClass(camellib.mappedClasses.get(element+"/"+tempManifest.class),[],tempManifest.name,tempManifest.description));
+
+            camellib.plugins.set(tempManifest.name,new plugClass(camellib.mappedClasses.get(element+"/"+tempManifest.class),[],tempManifest));
+
             tempManifest.commands.forEach(command=>{
                 // Load the command's class
                 let tempObject = require('./plugins/'+element+"/"+command.class)
@@ -193,14 +160,21 @@ getDirectories('./plugins').toString().split(',').forEach(element=>{
     }
 })
 
+// That way everyone knows that plugins are loaded so they can make callbacks
 camellib.emit('pluginsLoaded');
 
 client.on('interaction',interaction=>{
     if(interaction.isCommand()){
+        // Super easy way to call methods that are already mapped
         camellib.mappedCommands.get(interaction.command.name).method(new commandRunner(interaction,null,'discord'))
     }
 })
 
+/**
+ * 
+ * @param {String} path Path of the folder you want to get a list of files from
+ * @returns {null} 
+ */
 function getDirectories(path) {
     return fs.readdirSync(path).filter(function (file) {
       return fs.statSync(path+'/'+file).isDirectory();

@@ -9,10 +9,10 @@ module.exports = class command {
         this.method=method
         this.plugin=plugin
     }
-    /**@type {Object} */
+    /**@type {Object} The JSON object of the manifest*/
     manifest;
-    /**@type {Function} */
+    /**@type {Function} The method the command will run*/
     method;
-    /**@type {String} */
+    /**@type {String} The name of the plugin the command belongs to*/
     plugin;
 }

@@ -30,14 +30,20 @@ module.exports = class plugin extends EventEmitter {
         this.client = client;
         this.client.on('interaction',interaction=>{
             if(interaction.isButton()){
+                /**@type {Object} The parsed JSON from the button interaction ID */
                 let buttonInteraction
                 try{
+                    // This plugin uses the button ID in a stringified JSON for passing values
                     buttonInteraction = JSON.parse(interaction.customID)
                 }catch(err){
                     console.log(err)
                     return;
                 }
+                // If it happens to parse as a JSON, check if it follows the property
+                if(!buttonInteraction.hasOwnProperty("command")) return;
+                // Check if the command is this one
                 if(buttonInteraction.command=="plugins"){
+                    // Only an admin can change plugin toggles
                     if(!interaction.member.permissions.has('ADMINISTRATOR')){
                         let toSend = new Discord.MessageEmbed()
                             .setTitle("Error")
@@ -47,12 +53,18 @@ module.exports = class plugin extends EventEmitter {
                         interaction.reply({embeds:[toSend],ephemeral:true})
                         return;
                     }
+                    if(!buttonInteraction.hasOwnProperty("button")) return;
                     if(buttonInteraction.button=='disable'){
-                        let enabledPlugins = camellib.database.get(interaction.guild.id).enabledPlugins
-                        enabledPlugins.splice(enabledPlugins.indexOf(buttonInteraction.plugin))
+                        // Get a list of enabled plugins 
+                        let enabledPlugins = camellib.database.get(interaction.guild.id).enabledPlugins;
+                        // Chop it from the list
+                        enabledPlugins.splice(enabledPlugins.indexOf(buttonInteraction.plugin));
+                        // Save the database
                         camellib.saveDatabase();
+                        // Purge all the unecessary commands
                         camellib.purgeCommands();
-                        camellib.emit('pluginDisabled',interaction.guild.id,buttonInteraction.plugin)
+                        // Let all plugins know that a plugin has been disabled
+                        camellib.emit('pluginDisabled',interaction.guild.id,buttonInteraction.plugin);
                         let toSend = new Discord.MessageEmbed()
                             .setColor("#340034")
                             .setTitle(buttonInteraction.plugin+" disabled")
@@ -88,7 +100,7 @@ module.exports = class plugin extends EventEmitter {
 
     /**
      * 
-     * @param {commandRunner} commandRunner 
+     * @param {commandRunner} commandRunner TODO: fix this
      */
     help(commandRunner){
         if(commandRunner.source=='discord'){
@@ -154,7 +166,7 @@ module.exports = class plugin extends EventEmitter {
 
 
 /**
- * @returns {String}
+ * @returns {String} Returns a random color in hex
  */
 function generateColor(){
     const allowedHex = ["0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F"]
