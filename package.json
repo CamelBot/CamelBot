@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "clean": "rm ./logs/* && node index.js"
+    "clean": "rm ./logs/* && node index.js",
+    "lint": "eslint"
   },
   "author": "jkcoxson",
   "license": "None",
@@ -14,5 +15,8 @@
     "discord.js": "github:discordjs/discord.js",
     "node-fetch": "^2.6.1",
     "winston": "^3.3.3"
+  },
+  "devDependencies": {
+    "eslint": "^7.30.0"
   }
 }

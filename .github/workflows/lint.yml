@@ -1,0 +1,19 @@
+name: Lint
+
+on:
+    push:
+        branches: ["master", "camelbot-*.x"]
+    pull_request:
+        branches: ["master", "camelbot-*.x"]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v2
+            - uses: actions/setup-node@v2
+              with:
+                  node-version: 16
+                  cache: "npm"
+            - run: npm run lint
