@@ -1,3 +1,5 @@
+// Represents a class loaded from the manifest, mostly for intellisense purposes
+
 const camelLibjs = require("./camelLib")
 const winston = require('winston')
 

@@ -6,8 +6,13 @@ const { EventEmitter } = require('events');
 const { resolve } = require('path');
 const fs = require('fs')
 const coreLibjs = require('./coreCommands');
-const { Client } = require('discord.js');
+const { Client, DiscordAPIError } = require('discord.js');
 const winston = require('winston');
+const discord = require('discord.js');
+const plugClass = require('./plugClass');
+const mappedClass = require('./mappedClass');
+const mappedCommands = require('./command');
+const command = require('./command');
 
 module.exports = class camellib extends EventEmitter {
     constructor(parameters){
@@ -22,21 +27,26 @@ module.exports = class camellib extends EventEmitter {
         })
         this.saveDatabase()
     }
-    /**@type {Object} */
+    /**@type {Object} Stores the private JSON that contains environment specific data*/
     private;
-    /**@type {Client} */
+    /**@type {discord.Client} The discord.js client */
     client;
-    /**@type {Map} */
+    /**@type {Map} A map of database records with keys as a guild id */
     database;
-    /**@type {winston.Logger} */
+    /**@type {winston.Logger} Core logger */
     logger;
+    /**@type {Map<plugClass>} Map of plugins, keyed by plugin name */
     plugins;
+    /**@type {Map<mappedClass>} Map of classes defined in each manifest, keyed by pluginName/className */
     mappedClasses;
+    /**@type {Map<command>} Map of keyed command names to methods and manifests */
     mappedCommands;
+    /**@type {coreLibjs} A class for the core commands of CamelBot*/
     coreLib = new coreLibjs({
         "logger":this.logger,
         "camellib":this
     });
+    /**@type {Array<Object>} Basically the manifest for the core commands so they can be loaded by the normal loader */
     coreCommands = [
         {
             "name":"help",
@@ -61,6 +71,9 @@ module.exports = class camellib extends EventEmitter {
             "options":[]
         }
     ]
+    /**
+     * Adds them to the map since they weren't loaded by the manifest loader
+     */
     mapCoreCommands(){
         this.mappedClasses.set("core/coreCommands.js",this.coreLib)
         this.coreCommands.forEach(command=>{
@@ -74,7 +87,7 @@ module.exports = class camellib extends EventEmitter {
     }
 
     /**
-     * Initiates commands if they aren't already created. Once
+     * Initiates commands if they aren't already created. IF THEY ALREADY EXIST THEY WILL NOT BE OVERWRITTEN
      */
     publishCommands(){
         this.database.forEach(guild=>{
@@ -87,6 +100,7 @@ module.exports = class camellib extends EventEmitter {
                                 description: command.manifest.description,
                                 options: command.manifest.options
                             })
+                            // If plugins want to edit functions, they can know that it exists now
                             this.emit("commandCreated",(guild.id,command.manifest.name))
                         }
                     })
@@ -121,7 +135,9 @@ module.exports = class camellib extends EventEmitter {
             
         })
     }
-
+    /**
+     * Converts the database map back to a JSON and saves it
+     */
     async saveDatabase(){
         let toSend = []
         this.database.forEach(guild=>{
