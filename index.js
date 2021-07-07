@@ -136,7 +136,8 @@ client.on('ready',async ()=>{
     camellib.purgeCommands();
     // Make sure that all commands are up to date on each guild
     camellib.publishCommands();
-    
+    // That way everyone knows that plugins are loaded so they can make callbacks
+    camellib.emit('pluginsLoaded');
 })
 
 
@@ -204,8 +205,7 @@ getDirectories('./plugins').toString().split(',').forEach(element=>{
     }
 })
 
-// That way everyone knows that plugins are loaded so they can make callbacks
-camellib.emit('pluginsLoaded');
+
 
 client.on('interaction',interaction=>{
     if(interaction.isCommand()){
