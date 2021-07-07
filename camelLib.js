@@ -41,27 +41,27 @@ module.exports = class camellib extends EventEmitter {
     });
     /**@type {Array<Object>} Basically the manifest for the core commands so they can be loaded by the normal loader */
     coreCommands = [{
-            'name': 'help',
-            'description': 'Get help using CamelBot',
-            'class': 'coreCommands.js',
-            'method': 'help',
-            'source': [
-                'discord',
-                'minecraft'
-            ],
-            'options': []
-        },
-        {
-            'name': 'plugins',
-            'description': 'Turn on or off a command',
-            'class': 'coreCommands.js',
-            'method': 'pluginCommand',
-            'source': [
-                'discord',
-                'minecraft'
-            ],
-            'options': []
-        }
+        'name': 'help',
+        'description': 'Get help using CamelBot',
+        'class': 'coreCommands.js',
+        'method': 'help',
+        'source': [
+            'discord',
+            'minecraft'
+        ],
+        'options': []
+    },
+    {
+        'name': 'plugins',
+        'description': 'Turn on or off a command',
+        'class': 'coreCommands.js',
+        'method': 'pluginCommand',
+        'source': [
+            'discord',
+            'minecraft'
+        ],
+        'options': []
+    }
     ]
     /**
      * Adds them to the map since they weren't loaded by the manifest loader

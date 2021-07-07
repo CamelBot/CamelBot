@@ -130,24 +130,24 @@ module.exports = class plugin extends EventEmitter {
                 if (camellib.database.get(commandRunner.interaction.guild.id).enabledPlugins.includes(thisplug.name)) {
                     comp.addComponents(
                         new Discord.MessageButton()
-                        .setCustomID(JSON.stringify({
-                            'command': 'plugins',
-                            'plugin': thisplug.name,
-                            'button': 'disable'
-                        }))
-                        .setLabel('disable')
-                        .setStyle('DANGER')
+                            .setCustomID(JSON.stringify({
+                                'command': 'plugins',
+                                'plugin': thisplug.name,
+                                'button': 'disable'
+                            }))
+                            .setLabel('disable')
+                            .setStyle('DANGER')
                     );
                 } else {
                     comp.addComponents(
                         new Discord.MessageButton()
-                        .setCustomID(JSON.stringify({
-                            'command': 'plugins',
-                            'plugin': thisplug.name,
-                            'button': 'enable'
-                        }))
-                        .setLabel('enable')
-                        .setStyle('PRIMARY')
+                            .setCustomID(JSON.stringify({
+                                'command': 'plugins',
+                                'plugin': thisplug.name,
+                                'button': 'enable'
+                            }))
+                            .setLabel('enable')
+                            .setStyle('PRIMARY')
                     );
                 }
 
