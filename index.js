@@ -181,3 +181,20 @@ function getDirectories(path) {
     });
 }
 
+// Uh oh danger time
+// Hot loading new servers so we don't break stuff
+client.on('guildCreate',guild=>{
+    camellib.database.set(guild.id,{
+        "id":guild.id,
+        "name":guild.name,
+        "enabledPlugins":[]
+    });
+    camellib.saveDatabase();
+    camellib.emit("guildJoined",guild);
+});
+
+client.on('guildDelete',guild=>{
+    camellib.database.delete(guild.id);
+    camellib.saveDatabase();
+    camellib.emit("guildKicked",guild);
+})
