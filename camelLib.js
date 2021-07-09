@@ -6,13 +6,6 @@ const {
 } = require('events');
 const fs = require('fs');
 const coreLibjs = require('./coreCommands');
-const { Client, DiscordAPIError } = require('discord.js');
-const winston = require('winston');
-const discord = require('discord.js');
-const plugClass = require('./plugClass');
-const mappedClass = require('./mappedClass');
-const mappedCommands = require('./command');
-const command = require('./command');
 
 
 module.exports = class camellib extends EventEmitter {
