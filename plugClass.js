@@ -1,16 +1,11 @@
-
-
-const winston = require('winston');
-
-const camelLibjs = require('./camelLib');
-
 module.exports = class plugin {
-    constructor(mappedClass, commands, manifest){
-        this.class=mappedClass;
-        this.commands=commands
-        this.name=manifest.name
-        this.description=manifest.description
-        this.manifest=manifest
+
+    constructor(mappedClass, commands, manifest) {
+        this.class = mappedClass;
+        this.commands = commands;
+        this.name = manifest.name;
+        this.description = manifest.description;
+        this.manifest = manifest;
     }
     /**@type {Class} */
     class;
@@ -22,4 +17,5 @@ module.exports = class plugin {
     description;
     /**@type {Object} */
     manifest;
-}
+};
+
