@@ -1,24 +1,25 @@
 {
-  "name": "camelbot",
-  "version": "4.0.0",
-  "description": "jkcoxson biggest brain",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js",
-    "clean": "rm ./logs/* && node index.js",
-    "lint": "node ./node_modules/.bin/eslint $(find . -name \"*.js\" -not -path \"./node_modules/*\")"
-  },
-  "author": "jkcoxson",
-  "license": "None",
-  "dependencies": {
-    "discord.js": "github:discordjs/discord.js",
-    "node-fetch": "^2.6.1",
-    "winston": "^3.3.3"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.14.6",
-    "@babel/eslint-parser": "^7.14.7",
-    "eslint": "^7.30.0"
-  }
+    "name": "camelbot",
+    "version": "4.0.0",
+    "description": "jkcoxson biggest brain",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node index.js",
+        "clean": "rm ./logs/* && node index.js",
+        "lint": "node ./node_modules/.bin/eslint $(find . -name \"*.js\" -not -path \"./node_modules/*\")",
+        "lint-fix": "node ./node_modules/.bin/eslint --fix $(find . -name \"*.js\" -not -path \"./node_modules/*\")"
+    },
+    "author": "jkcoxson",
+    "license": "None",
+    "dependencies": {
+        "discord.js": "github:discordjs/discord.js",
+        "node-fetch": "^2.6.1",
+        "winston": "^3.3.3"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.14.6",
+        "@babel/eslint-parser": "^7.14.7",
+        "eslint": "^7.30.0"
+    }
 }
