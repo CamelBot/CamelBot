@@ -6,6 +6,14 @@ const {
 } = require('events');
 const fs = require('fs');
 const coreLibjs = require('./coreCommands');
+const { Client, DiscordAPIError } = require('discord.js');
+const winston = require('winston');
+const discord = require('discord.js');
+const plugClass = require('./plugClass');
+const mappedClass = require('./mappedClass');
+const mappedCommands = require('./command');
+const command = require('./command');
+
 
 module.exports = class camellib extends EventEmitter {
     constructor(parameters) {
@@ -66,6 +74,7 @@ module.exports = class camellib extends EventEmitter {
     /**
      * Adds them to the map since they weren't loaded by the manifest loader
      */
+
     mapCoreCommands() {
         this.mappedClasses.set('core/coreCommands.js', this.coreLib);
         this.coreCommands.forEach(command => {
@@ -91,6 +100,7 @@ module.exports = class camellib extends EventEmitter {
                                 name: command.manifest.name,
                                 description: command.manifest.description,
                                 options: command.manifest.options
+
                             });
                             // If plugins want to edit functions, they can know that it exists now
                             this.emit('commandCreated', (guild.id, command.manifest.name));
@@ -122,6 +132,7 @@ module.exports = class camellib extends EventEmitter {
                         command.delete();
                         this.emit('commandDeleted', (guild.id, command.name));
                     }
+
                 });
             });
 
@@ -130,6 +141,7 @@ module.exports = class camellib extends EventEmitter {
     /**
      * Converts the database map back to a JSON and saves it
      */
+
     async saveDatabase() {
         let toSend = [];
         this.database.forEach(guild => {

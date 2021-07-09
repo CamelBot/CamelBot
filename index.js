@@ -2,7 +2,52 @@
 // Let's try not to hate everything edition
 // jkcoxson
 
-console.log('System Startup, all hail camels');
+console.log("System Startup, all hail camels")
+const splashScreen = "                                                          `7wy$AOBBB@@@Df^`                         \n" +
+"                                                        ?BB@@@@@@@@@@@@@@@ga7:                      \n" +
+"              ```:,                                     X@@@@@@@@@@@@@@@@@@@@@X~                    \n" +
+"          `|hQ@@@@@:                                   x@@@@@@@@@@@@@@@@@@@@@@@@p*.                 \n" +
+"    ';cI2O@@@@@@@@@8:                          `+*<?IqB@@@@@@@@@@@@@@@@@@@@@@@@@@@@QA1r:'           \n" +
+" ,mB@@@@@@@@@@@@@@@@X                       .tpB@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@B$7,       \n" +
+"|@@@@@@@@@@@@@@@@@@@@'                    `|B@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*      \n" +
+"vy8dw9@@@@@@@@@@@@@@@Q:                  `M@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Q;     \n" +
+"      $@?;tHB@@@@@@@@@B*`               'k@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@<    \n" +
+"      m^?^;'yg@@@@@@@@@@1             `v@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@X'  \n" +
+"      I   '=\\`R@@@@@@@@@@;          ,wB@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@N  \n" +
+"      1       `#@@@@@@@@@@9?'`  ';IO@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@' \n" +
+"      t        .H@@@@@@@@@@@@@BB@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@; \n" +
+"      }         `N@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@: \n" +
+"      }          `p@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@` \n" +
+"      ;?           *%@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@BR@@@@@@@@@@@@@B  \n" +
+"       :'            ~yB@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@U?`?@@@@@@@@@@@@@B` \n" +
+"                        ,iXDB@@@@@@B#qy7^,1B@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@BI,   ;@@@@@@@@@@@@@@^ \n" +
+"                                           `\\N@@@@@@@@@@@@@@@@@@@@@@@@@@Bpy=.      I@@@@@@@@@@@@@@B.\n" +
+"                                              Q@@@@@@r/}}1i+?|iiii|?r;,`           'B@@@@@@@@@@@@B@,\n" +
+"                                              ?@@@@@@                               :B@@@@@@@@@@@GH \n" +
+"                                              `d@@@@@,                               ,B@@@@@@@@@@>; \n" +
+"                                               ;@@@@@=                                r@@@@@@@@@@r  \n" +
+"                                                Q@@@@y                                ^@@@@qp@@@@I  \n" +
+"                                                X@@@@N`                               ;@@@@Dr@@@@B` \n" +
+"                                                l@@@@@<                               '@@@@B G@@@@i \n" +
+"                                                +@@@@@R                                B@@@@`'@@@@B`\n" +
+"                                                |@@@@@@~                               @@@@@* A@@@@R\n" +
+"                                                I@@@@@@.                              ,@@@@B~ A@@@@l\n" +
+"                                                ;@@@@@@                               j@@@#'  $@@@h \n" +
+"                                                 k@@@@N                               B@@R`   y@@@. \n" +
+"                                                 ?@@R@R                              :@@q.    z@@t  \n" +
+"                                                 *@B*@g                             `R@D`     w@N`  \n" +
+"                                                 i@W;@B                             }@B.      8@7   \n" +
+"                                                 w@$;@@                            :@@:      `@@`   \n" +
+"                                                 B@Xy@@:                          :B@|       <@q    \n" +
+"                                                f@@D@@@:                         +@@j       `R@1    \n" +
+"                                               :@@@@@@B.                    `;|yB@@v`       W@@?    \n" +
+"                                            `:FB@@@@BBW^                    :GpDWgp      `:$@@H`    \n" +
+"                                           ~Q@@@@@#i                                   `D@@@@@t     \n\n\n" +
+"                                        ####################                                        \n" +
+"                                        ##### CamelBot #####                                        \n" +
+"                                        ####################                                        \n"
+
+console.log(splashScreen)
 
 const winston = require('winston');
 const Discord = require('discord.js');
@@ -13,6 +58,7 @@ const commandRunner = require('./commandRunner');
 const fs = require('fs');
 const mappedClass = require('./mappedClass');
 const camellib = new camelLibjs({
+
     'private': require('./configs/private.json'),
     'database': require('./configs/database.json'),
 });
@@ -72,7 +118,9 @@ client.login(camellib.private.token).catch((error) => {
 }).then(() => {
     camellib.client = client;
 
-});
+
+
+
 
 // Once Discord is ready
 client.on('ready', async () => {
@@ -90,10 +138,13 @@ client.on('ready', async () => {
             } catch (err) {
                 logger.error('Error while updating guild information');
                 logger.error(err);
+
             }
 
         }
+
     });
+
     // Save the database after a possible write
     camellib.saveDatabase();
     // Map the commands for loading later
@@ -102,8 +153,10 @@ client.on('ready', async () => {
     camellib.purgeCommands();
     // Make sure that all commands are up to date on each guild
     camellib.publishCommands();
-
+    // That way everyone knows that plugins are loaded so they can make callbacks
+    camellib.emit('pluginsLoaded');
 });
+
 
 
 
@@ -115,6 +168,7 @@ getDirectories('./plugins').toString().split(',').forEach(element => {
             let tempManifest = require('./plugins/' + element + '/manifest.json');
             // Load the class of the plugin
             let tempObject = require('./plugins/' + element + '/' + tempManifest.class);
+
             // Create a logger for the plugin's class so we don't clog the main logger
             let tempLogger = winston.createLogger({
                 level: 'info',
@@ -152,6 +206,7 @@ getDirectories('./plugins').toString().split(',').forEach(element => {
                 )
             }));
 
+
             // Map the plugin's main class
             camellib.mappedClasses.set(element + '/' + tempManifest.class, new tempObject(new mappedClass(tempLogger, camellib)));
 
@@ -179,6 +234,7 @@ getDirectories('./plugins').toString().split(',').forEach(element => {
     }
 });
 
+
 // That way everyone knows that plugins are loaded so they can make callbacks
 camellib.emit('pluginsLoaded');
 
@@ -198,4 +254,24 @@ function getDirectories(path) {
     return fs.readdirSync(path).filter(function(file) {
         return fs.statSync(path + '/' + file).isDirectory();
     });
+
 }
+
+// Uh oh danger time
+// Hot loading new servers so we don't break stuff
+client.on('guildCreate',guild=>{
+    camellib.database.set(guild.id,{
+        "id":guild.id,
+        "name":guild.name,
+        "enabledPlugins":[]
+    });
+    camellib.saveDatabase();
+    camellib.emit("guildJoined",guild);
+});
+
+client.on('guildDelete',guild=>{
+    camellib.database.delete(guild.id);
+    camellib.saveDatabase();
+    camellib.emit("guildKicked",guild);
+})
+

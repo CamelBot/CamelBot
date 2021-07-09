@@ -45,6 +45,7 @@ module.exports = class plugin extends EventEmitter {
                         });
                         return;
                     }
+
                     if (!Object.prototype.hasOwnProperty.call(buttonInteraction, 'button')) return;
                     if (buttonInteraction.button == 'disable') {
                         // Get a list of enabled plugins 
@@ -56,6 +57,7 @@ module.exports = class plugin extends EventEmitter {
                         // Purge all the unecessary commands
                         camellib.purgeCommands();
                         // Let all plugins know that a plugin has been disabled
+
                         camellib.emit('pluginDisabled', interaction.guild.id, buttonInteraction.plugin);
                         let toSend = new Discord.MessageEmbed()
                             .setColor('#340034')

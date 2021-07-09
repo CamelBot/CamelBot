@@ -1,4 +1,5 @@
 module.exports = class plugin {
+
     constructor(mappedClass, commands, manifest) {
         this.class = mappedClass;
         this.commands = commands;
@@ -17,3 +18,4 @@ module.exports = class plugin {
     /**@type {Object} */
     manifest;
 };
+
