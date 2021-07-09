@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
     "clean": "rm ./logs/* && node index.js",
-    "lint": "node ./.bin/eslint $(find . -name \"*.js\" -not -path \"./node_modules/*\")"
+    "lint": "node ./node_modules/.bin/eslint $(find . -name \"*.js\" -not -path \"./node_modules/*\")"
   },
   "author": "jkcoxson",
   "license": "None",
