@@ -81,9 +81,11 @@ module.exports = class camellib extends EventEmitter {
                 "manifest":command,
                 "method":this.coreLib[command.method],
                 "plugin":"core"
-            })
-        })
-        this.coreLib.initClient(this.client)
+            });
+        });
+        this.once('pluginsLoaded',()=>{
+            this.coreLib.initClient(this.client)
+        });
     }
 
     /**

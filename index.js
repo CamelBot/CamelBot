@@ -3,7 +3,7 @@
 // jkcoxson
 
 console.log("System Startup, all hail camels")
-const splashScreen = "                                     `7wy$AOBBB@@@Df^`                         \n" +
+const splashScreen = "                                                          `7wy$AOBBB@@@Df^`                         \n" +
 "                                                        ?BB@@@@@@@@@@@@@@@ga7:                      \n" +
 "              ```:,                                     X@@@@@@@@@@@@@@@@@@@@@X~                    \n" +
 "          `|hQ@@@@@:                                   x@@@@@@@@@@@@@@@@@@@@@@@@p*.                 \n" +
