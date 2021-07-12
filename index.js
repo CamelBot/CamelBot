@@ -254,7 +254,6 @@ function getDirectories(path) {
 
 }
 
-// Uh oh danger time
 // Hot loading new servers so we don't break stuff
 client.on('guildCreate', guild => {
     camellib.database.set(guild.id, {

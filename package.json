@@ -13,8 +13,12 @@
     "author": "jkcoxson",
     "license": "None",
     "dependencies": {
+        "@discordjs/voice": "^0.5.3",
         "discord.js": "github:discordjs/discord.js",
+        "ffmpeg": "^0.0.4",
+        "ffmpeg-static": "^4.4.0",
         "node-fetch": "^2.6.1",
+        "sodium": "^3.0.2",
         "winston": "^3.3.3"
     },
     "devDependencies": {
