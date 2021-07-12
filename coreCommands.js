@@ -193,7 +193,6 @@ module.exports = class plugin extends EventEmitter {
         }
 
     }
-
 };
 
 
@@ -221,4 +220,3 @@ function getPluginMenu() {
 
     return (toReturn);
 }
-
