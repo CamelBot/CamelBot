@@ -208,6 +208,7 @@ function generateColor() {
     }
     return (toSend);
 }
+
 function getPluginMenu() {
     let toReturn = [];
     camellib.plugins.forEach(plugin => {
