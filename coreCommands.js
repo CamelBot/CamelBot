@@ -17,13 +17,13 @@ module.exports = class plugin extends EventEmitter {
 
     initClient(client) {
         this.client = client;
-        this.client.on('interaction', interaction => {
+        this.client.on('interactionCreate', interaction => {
             if (interaction.isButton()) {
                 /**@type {Object} The parsed JSON from the button interaction ID */
                 let buttonInteraction;
                 try {
                     // This plugin uses the button ID in a stringified JSON for passing values
-                    buttonInteraction = JSON.parse(interaction.customID);
+                    buttonInteraction = JSON.parse(interaction.customId);
                 } catch (err) {
                     console.log(err);
                     return;
@@ -64,9 +64,10 @@ module.exports = class plugin extends EventEmitter {
                             .setTitle(buttonInteraction.plugin + ' disabled')
                             .addField('Success', 'All commands and features are now disabled for your Discord Server')
                             .setTimestamp();
-                        interaction.reply({
+                        interaction.channel.send({
                             embeds: [toSend]
                         });
+                        interaction.message.delete();
                         return;
                     }
                     if (buttonInteraction.button == 'enable') {
@@ -84,13 +85,66 @@ module.exports = class plugin extends EventEmitter {
                             .setTitle(buttonInteraction.plugin + ' enabled')
                             .addField('Success', 'All commands and features are now active in your server')
                             .setTimestamp();
-                        interaction.reply({
+                        interaction.channel.send({
                             embeds: [toSend]
                         });
+                        interaction.message.delete();
                         return;
                     }
                 }
 
+
+            }
+            if (interaction.isSelectMenu()) {
+                /**@type {Discord.SelectMenuInteraction} */
+                let menuInteraction = interaction;
+                let menuJson;
+                try {
+                    menuJson = JSON.parse(interaction.customId);
+                } catch {
+                    return;
+                }
+                if (!menuJson.command == 'plugins' && menuJson.type == 'selecter') return;
+                camellib.plugins.forEach(plugin => {
+                    /**@type {plugClass} */
+                    let thisplug = plugin;
+                    if (thisplug.name !== menuInteraction.values[0]) return;
+                    let embed = new Discord.MessageEmbed()
+                        .setTitle('__' + thisplug.name + '__')
+                        .addField('Description', thisplug.description)
+                        .setColor(generateColor());
+
+                    let comp = new Discord.MessageActionRow();
+                    if (camellib.database.get(menuInteraction.guild.id).enabledPlugins.includes(thisplug.name)) {
+                        comp.addComponents(
+                            new Discord.MessageButton()
+                                .setCustomId(JSON.stringify({
+                                    'command': 'plugins',
+                                    'plugin': thisplug.name,
+                                    'button': 'disable'
+                                }))
+                                .setLabel('disable')
+                                .setStyle('DANGER')
+                        );
+                    } else {
+                        comp.addComponents(
+                            new Discord.MessageButton()
+                                .setCustomId(JSON.stringify({
+                                    'command': 'plugins',
+                                    'plugin': thisplug.name,
+                                    'button': 'enable'
+                                }))
+                                .setLabel('enable')
+                                .setStyle('PRIMARY')
+                        );
+                    }
+
+
+                    menuInteraction.reply({
+                        embeds: [embed],
+                        components: [comp]
+                    });
+                });
 
             }
         });
@@ -114,51 +168,26 @@ module.exports = class plugin extends EventEmitter {
         if (commandRunner.source == 'discord') {
             const toSend = new Discord.MessageEmbed()
                 .setTitle('**__Plugins__**')
-                .addField('Installed plugins', 'Below are all commands installed in CamelBot, enable or disable them here.')
+                .addField('Installed plugins', 'Select the plugin you want to get more information and configure.')
                 .setColor(generateColor());
+            let selectMenu = new Discord.MessageSelectMenu()
+                .setCustomId(JSON.stringify({
+                    'command': 'plugins',
+                    'type': 'selecter'
+                }))
+                .setPlaceholder('No plugin selected')
+                .setMinValues(0)
+                .setMaxValues(1)
+                .addOptions(getPluginMenu());
+            const row = new Discord.MessageActionRow()
+                .addComponents(
+                    selectMenu
+                );
             commandRunner.interaction.reply({
-                embeds: [toSend]
+                embeds: [toSend],
+                components: [row]
             });
-            camellib.plugins.forEach(plugin => {
-                /**@type {plugClass} */
-                let thisplug = plugin;
 
-                let embed = new Discord.MessageEmbed()
-                    .setTitle('__' + thisplug.name + '__')
-                    .addField('Description', thisplug.description)
-                    .setColor(generateColor());
-
-                let comp = new Discord.MessageActionRow();
-                if (camellib.database.get(commandRunner.interaction.guild.id).enabledPlugins.includes(thisplug.name)) {
-                    comp.addComponents(
-                        new Discord.MessageButton()
-                            .setCustomID(JSON.stringify({
-                                'command': 'plugins',
-                                'plugin': thisplug.name,
-                                'button': 'disable'
-                            }))
-                            .setLabel('disable')
-                            .setStyle('DANGER')
-                    );
-                } else {
-                    comp.addComponents(
-                        new Discord.MessageButton()
-                            .setCustomID(JSON.stringify({
-                                'command': 'plugins',
-                                'plugin': thisplug.name,
-                                'button': 'enable'
-                            }))
-                            .setLabel('enable')
-                            .setStyle('PRIMARY')
-                    );
-                }
-
-
-                commandRunner.interaction.followUp({
-                    embeds: [embed],
-                    components: [comp]
-                });
-            });
 
 
         }
@@ -178,4 +207,17 @@ function generateColor() {
         toSend += allowedHex[Math.floor(Math.random() * allowedHex.length)];
     }
     return (toSend);
+}
+
+function getPluginMenu() {
+    let toReturn = [];
+    camellib.plugins.forEach(plugin => {
+        toReturn.push({
+            'label': plugin.name,
+            'description': plugin.description.substr(0, 45) + '...',
+            'value': plugin.name
+        });
+    });
+
+    return (toReturn);
 }

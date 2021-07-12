@@ -1,7 +1,7 @@
 module.exports = class commandRunner {
     /**
      * 
-     * @param {Discord.CommandInteraction} interaction The interaction to reply or manage
+     * @param {import('discord.js').CommandInteraction} interaction The interaction to reply or manage
      * @param {Object} externalsource TODO: remember what this is for
      * @param {String} source The name of the source that it came from, for example commands from discord will report 'discord'
      */
@@ -10,7 +10,7 @@ module.exports = class commandRunner {
         this.externalsource = externalsource;
         this.source = source;
     }
-    /**@type {Discord.CommandInteraction|null} The interaction to reply or manage*/
+    /**@type {import('discord.js').CommandInteraction|null} The interaction to reply or manage*/
     interaction
     /**@type {Object|null} TODO: remember what this is for */
     externalsource

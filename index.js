@@ -235,7 +235,7 @@ getDirectories('./plugins').toString().split(',').forEach(element => {
 });
 
 
-client.on('interaction', interaction => {
+client.on('interactionCreate', interaction => {
     if (interaction.isCommand()) {
         // Super easy way to call methods that are already mapped
         camellib.mappedCommands.get(interaction.command.name).method(new commandRunner(interaction, null, 'discord'));
@@ -254,7 +254,6 @@ function getDirectories(path) {
 
 }
 
-// Uh oh danger time
 // Hot loading new servers so we don't break stuff
 client.on('guildCreate', guild => {
     camellib.database.set(guild.id, {

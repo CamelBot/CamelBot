@@ -23,7 +23,7 @@ module.exports = class camellib extends EventEmitter {
     }
     /**@type {Object} Stores the private JSON that contains environment specific data*/
     private;
-    /**@type {discord.Client} The discord.js client */
+    /**@type {import('discord.js').Client} The discord.js client */
     client;
     /**@type {Map} A map of database records with keys as a guild id */
     database;

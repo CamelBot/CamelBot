@@ -1,6 +1,6 @@
-  
 plugins/*
 configs/*
 test.json
 node_modules
 logs/*
+.vscode
