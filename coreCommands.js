@@ -193,7 +193,6 @@ module.exports = class plugin extends EventEmitter {
         }
 
     }
-
 };
 
 
@@ -209,6 +208,7 @@ function generateColor() {
     }
     return (toSend);
 }
+
 function getPluginMenu() {
     let toReturn = [];
     camellib.plugins.forEach(plugin => {
@@ -221,4 +221,3 @@ function getPluginMenu() {
 
     return (toReturn);
 }
-
