@@ -223,6 +223,7 @@ getDirectories('./plugins').toString().split(',').forEach(element => {
                 camellib.mappedCommands.set(command.name, new commandClass(command, camellib.mappedClasses.get(element + '/' + tempManifest.class)[command.method], tempManifest.name));
                 // Push them to the plugin's object so the command loader knows what to load
                 camellib.plugins.get(tempManifest.name).commands.push(command.name);
+
             });
         } catch (err) {
             logger.error('Unable to load manifest for plugin ' + element + ': ' + err);

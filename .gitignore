@@ -4,3 +4,5 @@ test.json
 node_modules
 logs/*
 .vscode
+database.sqlite3*
+sentence_tokenizer.pickle
