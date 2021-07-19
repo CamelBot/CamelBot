@@ -11,6 +11,8 @@ const coreLibjs = require('./coreCommands');
 module.exports = class camellib extends EventEmitter {
     constructor(parameters) {
         super();
+        this.defaultMaxListeners = 50;
+        this.setMaxListeners(50);
         this.private = parameters.private;
         this.database = new Map();
         this.plugins = new Map();
@@ -130,6 +132,8 @@ module.exports = class camellib extends EventEmitter {
                         }
 
                     });
+                }).catch(() => {
+                    this.logger.error('Unable to read commands for ' + guild.name);
                 });
             });
 
