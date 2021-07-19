@@ -98,6 +98,8 @@ module.exports = class camellib extends EventEmitter {
                             // If plugins want to edit functions, they can know that it exists now
                             this.emit('commandCreated', (guild.id, command.manifest.name));
                         }
+                    }).catch(() => {
+                        this.logger.error('Unable to read commands for ' + guild.name);
                     });
                 }
             });
