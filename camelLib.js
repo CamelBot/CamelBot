@@ -110,24 +110,27 @@ module.exports = class camellib extends EventEmitter {
      */
     purgeCommands() {
         this.database.forEach(guild => {
-            this.client.guilds.cache.get(guild.id).commands.fetch().then(() => {
-                this.client.guilds.cache.get(guild.id).commands.cache.forEach(command => {
-                    let found = false;
-                    this.mappedCommands.forEach(element => {
-                        if (this.database.get(guild.id).enabledPlugins.includes(element.plugin) && element.manifest.name == command.name) {
-                            found = true;
+            this.on('pluginsLoaded', () => {
+                this.client.guilds.cache.get(guild.id).commands.fetch().then(() => {
+                    this.client.guilds.cache.get(guild.id).commands.cache.forEach(command => {
+                        let found = false;
+                        this.mappedCommands.forEach(element => {
+                            if (this.database.get(guild.id).enabledPlugins.includes(element.plugin) && element.manifest.name == command.name) {
+                                found = true;
+                            }
+                            if (element.plugin == 'core' && element.manifest.name == command.name) {
+                                found = true;
+                            }
+                        });
+                        if (!found) {
+                            command.delete();
+                            this.emit('commandDeleted', (guild.id, command.name));
                         }
-                        if (element.plugin == 'core' && element.manifest.name == command.name) {
-                            found = true;
-                        }
-                    });
-                    if (!found) {
-                        command.delete();
-                        this.emit('commandDeleted', (guild.id, command.name));
-                    }
 
+                    });
                 });
             });
+
 
         });
     }
