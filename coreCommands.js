@@ -188,7 +188,8 @@ module.exports = class plugin extends EventEmitter {
                 );
             commandRunner.interaction.reply({
                 embeds: [toSend],
-                components: [row]
+                components: [row],
+                ephemeral: true
             });
 
 
