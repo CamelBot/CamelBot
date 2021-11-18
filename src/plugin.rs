@@ -1,5 +1,6 @@
 // jkcoxson
 
+use serde::Serialize;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     net::TcpStream,
@@ -18,6 +19,13 @@ pub struct Plugin {
     console_handle: Option<Child>,
     receiver: UnboundedReceiver<String>,
     constructor: PluginConstructor,
+}
+
+#[derive(Serialize)]
+struct PacketFormat {
+    name: String,
+    source: String,
+    data: String,
 }
 
 impl Plugin {
@@ -95,7 +103,9 @@ impl Plugin {
                                 if msg == "kill" {
                                     break;
                                 }
+                                let msg = msg + "\n";
                                 stdin.write(msg.as_bytes()).await.unwrap();
+                                stdin.flush().await.unwrap();
                             }
                             None => {
                                 //break;
@@ -106,7 +116,13 @@ impl Plugin {
                         if buf.to_string().len() < 1 {
                             break;
                         }
-                        sender.send(buf.to_string()).unwrap();
+                        let msg = PacketFormat {
+                            name: self.constructor.name.clone(),
+                            source: "plugin".to_string(),
+                            data: buf.to_string(),
+                        };
+                        let msg = serde_json::to_string(&msg).unwrap();
+                        sender.send(msg).unwrap();
                     }
                 }
             }

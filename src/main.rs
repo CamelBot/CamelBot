@@ -14,6 +14,7 @@ use tokio::{
 
 mod config;
 mod constants;
+mod intents;
 mod interface;
 mod plugin;
 mod ui;
@@ -73,7 +74,7 @@ async fn main() {
             create_stdin_plugin(i, tx.clone(), local_rx);
         }
         // Put local_tx into the interface_arc
-        let mut plugin_arc = interface_arc.lock().await;
+        let mut plugin_arc = plugin_arc.lock().await;
         plugin_arc.insert(i.name.clone(), local_tx);
     }
 
@@ -121,6 +122,9 @@ async fn main() {
         ui::ui(cloned_arc, cloned_plugin_arc, kill_tx, cloned_tx).await;
     });
 
+    // Keep track of plugin intents
+    let mut plugin_intents: HashMap<String, intents::Intent> = HashMap::new();
+
     loop {
         tokio::select! {
             msg = interface_rx.recv() => {
@@ -129,6 +133,69 @@ async fn main() {
                     Ok(msg) => msg,
                     Err(_) => continue
                 };
+                let source = msg["source"].as_str().unwrap();
+                let name = msg["name"].as_str().unwrap();
+                let data = msg["data"].as_str().unwrap();
+
+                // Parse data as JSON
+                let data = match serde_json::from_str::<serde_json::Value>(data) {
+                    Ok(data) => data,
+                    Err(_) => continue
+                };
+
+                match data["packet"].as_str() {
+                    Some(packet) => {
+                        match packet {
+                            "message" => {
+                                match msg["source"].as_str().unwrap() {
+                                    "interface" => {
+                                        // Check if the plugin has the message intent
+                                        for (plugin_name, intent) in plugin_intents.iter() {
+                                            if intent.messages {
+                                                let mut plugin_arc = plugin_arc.lock().await;
+                                                let plugin_tx = plugin_arc.get_mut(plugin_name).unwrap();
+                                                plugin_tx.send(msg["data"].as_str().unwrap().to_string()).unwrap();
+                                            }
+                                        }
+                                    },
+                                    _ => continue
+                                }
+                            },
+                            "sendMessage" => {
+                                if msg["source"].as_str().unwrap() != "plugin" {
+                                    continue;
+                                }
+                                let data = &msg["data"].as_str().unwrap();
+                                // Parse data as JSON
+                                let data = match serde_json::from_str::<serde_json::Value>(data) {
+                                    Ok(data) => data,
+                                    Err(_) => continue
+                                };
+                                let target = data["target"].as_str().unwrap();
+                                // Get the target interface
+                                let mut interface_arc = interface_arc.lock().await;
+                                let interface_tx = match interface_arc.get_mut(target){
+                                    Some(interface_tx) => interface_tx,
+                                    None => continue
+                                };
+                                // Send the message to the interface
+                                interface_tx.send(msg["data"].as_str().unwrap().to_string()).unwrap();
+                            }
+                            "intents" => {
+                                // Check if source is a plugin
+                                if msg["source"].as_str().unwrap() != "plugin" {
+                                    continue;
+                                }
+                                // Create a new intent
+                                let intent = intents::Intent::new(msg["data"].as_str().unwrap().to_string());
+                                // Put the intent into the map
+                                plugin_intents.insert(name.to_string(), intent);
+                            }
+                            _ => continue
+                        }
+                    },
+                    None => continue,
+                }
 
             }
             _ = kill_rx.recv() => {

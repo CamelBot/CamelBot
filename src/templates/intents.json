@@ -1,0 +1,28 @@
+{
+    "packet": "intents",
+    "components": [
+        "Discord"
+    ],
+    "messages": true,
+    "events": [
+        "typingStart"
+    ],
+    "commands": [
+        {
+            "name": "test",
+            "interfaces": [
+                "Discord"
+            ],
+            "description": "yeet la yeet or doot doot idk ",
+            "parameters": [
+                {
+                    "name": "quantity",
+                    "type_": "INTEGER",
+                    "description": "How many yeets?",
+                    "required": true,
+                    "options": []
+                }
+            ]
+        }
+    ]
+}

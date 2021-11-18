@@ -2,6 +2,7 @@
 
 use std::process::Stdio;
 
+use serde::Serialize;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     net::TcpStream,
@@ -20,6 +21,13 @@ pub struct Interface {
     console_handle: Option<Child>,
     receiver: UnboundedReceiver<String>,
     constructor: InterfaceConstructor,
+}
+
+#[derive(Serialize)]
+struct PacketFormat {
+    name: String,
+    source: String,
+    data: String,
 }
 
 impl Interface {
@@ -111,7 +119,7 @@ impl Interface {
                                         {
                                             Ok(cmd) => cmd,
                                             Err(e) => {
-                                                println!("Failed to start plugin {}: {}", self.constructor.name, e);
+                                                println!("Failed to start interface {}: {}", self.constructor.name, e);
                                                 self.console_handle = None;
                                                 break;
                                             }
@@ -127,6 +135,7 @@ impl Interface {
                                     },
                                     _ => {
                                         stdin.write(msg.as_bytes()).await.unwrap();
+                                        stdin.flush().await.unwrap();
                                     }
                                 };
                             }
@@ -139,7 +148,13 @@ impl Interface {
                         if buf.to_string().len() < 1 {
                             break;
                         }
-                        sender.send(buf.to_string()).unwrap();
+                        let msg = PacketFormat {
+                            name: self.constructor.name.clone(),
+                            source: "interface".to_string(),
+                            data: buf.to_string(),
+                        };
+                        let msg = serde_json::to_string(&msg).unwrap();
+                        sender.send(msg).unwrap();
                     }
                 }
             }

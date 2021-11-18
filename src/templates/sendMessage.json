@@ -1,0 +1,7 @@
+{
+    "packet": "sendMessage",
+    "target": "Discord",
+    "channel": "123",
+    "message": "all my homies like rust",
+    "meta": {}
+}
