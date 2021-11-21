@@ -12,10 +12,12 @@ use tokio::{
     },
 };
 
+mod component;
 mod config;
 mod constants;
 mod intents;
 mod interface;
+mod packet;
 mod plugin;
 mod ui;
 
