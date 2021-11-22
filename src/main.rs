@@ -1,4 +1,4 @@
-// CamelBot - Rust edition
+// CamelBot - Horizon Edition (https://www.youtube.com/watch?v=8rCPtXVOsf8)
 // jkcoxson
 // All hail camels
 
