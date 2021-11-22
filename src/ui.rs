@@ -6,7 +6,7 @@ use tokio::sync::{mpsc::UnboundedSender, Mutex};
 use ansi_term::Style;
 use dialoguer::{theme::ColorfulTheme, Select};
 
-use crate::{config, create_stdin_interface, create_stdin_plugin};
+use crate::config;
 
 pub async fn ui(
     interface_arc: Arc<Mutex<HashMap<String, UnboundedSender<String>>>>,
@@ -24,7 +24,7 @@ pub async fn ui(
                     "Add Interface" => {
                         let interface = new_interface().await;
                         let (local_tx, local_rx) = tokio::sync::mpsc::unbounded_channel();
-                        create_stdin_interface(&interface, tx.clone(), local_rx);
+                        //create_stdin_interface(&interface, tx.clone(), local_rx);
                         interface_arc.lock().await.insert(interface.name, local_tx);
                     }
                     "Remove Interface" => {
@@ -62,7 +62,7 @@ pub async fn ui(
                     "Add Plugin" => {
                         let plugin = new_plugin().await;
                         let (local_tx, local_rx) = tokio::sync::mpsc::unbounded_channel();
-                        create_stdin_plugin(&plugin, tx.clone(), local_rx);
+                        //create_stdin_plugin(&plugin, tx.clone(), local_rx);
                         plugin_arc.lock().await.insert(plugin.name, local_tx);
                     }
                     "Remove Plugin" => {
