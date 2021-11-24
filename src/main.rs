@@ -41,11 +41,27 @@ async fn main() {
             println!("Interface {} is configured for network mode, but TCP mode is not enabled. It will not be loaded.", i.name);
             continue;
         }
+
+        // Create component
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        let mut comp = component::Component::new(i.name.clone(), 0, i.key.clone(), tx);
+        let comp = component::Component::new(i.name.clone(), 0, i.key.clone(), tx);
+
+        // Insert component into map
+        component_arc.lock().await.insert(i.name.clone(), comp);
+
+        // Start component
         let command = i.command.split(" ").collect::<Vec<&str>>()[0];
         let args = i.command.split(" ").skip(1).collect::<Vec<&str>>();
-        comp.connect(command, args, rx).await;
+        let args: Vec<String> = args.iter().map(|x| x.to_string()).collect();
+
+        component::Component::connect(
+            i.name.clone(),
+            command.to_string(),
+            args,
+            component_arc.clone(),
+            rx,
+        )
+        .await;
     }
 
     if config.tcp {

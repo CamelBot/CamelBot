@@ -7,7 +7,7 @@
 // 2 - Sniffer: it takes every packet before reaching its source and modifies it or drops it
 // Note: a sniffer should not be used unless needed because it can be very slow
 
-use std::process::Stdio;
+use std::{collections::HashMap, process::Stdio, sync::Arc};
 
 use tokio::{
     net::{
@@ -15,7 +15,10 @@ use tokio::{
         TcpStream,
     },
     process::{Child, ChildStdin, ChildStdout},
-    sync::mpsc::{UnboundedReceiver, UnboundedSender},
+    sync::{
+        mpsc::{UnboundedReceiver, UnboundedSender},
+        Mutex,
+    },
 };
 
 use crate::{intents::Intent, packet::Packet};
@@ -63,33 +66,42 @@ impl Component {
         false
     }
     pub async fn connect(
-        &mut self,
-        command: &str,
-        args: Vec<&str>,
+        id: String,
+        command: String,
+        args: Vec<String>,
+        components: Arc<Mutex<HashMap<String, Component>>>,
         receiver: UnboundedReceiver<Packet>,
     ) {
-        match self.network {
-            true => {
-                //
-            }
-            false => {
-                loop {
-                    // Create new command
-                    let mut cmd = match tokio::process::Command::new(command)
-                        .args(args.clone())
-                        .stdout(Stdio::piped())
-                        .stdin(Stdio::piped())
-                        .spawn()
-                    {
-                        Ok(cmd) => cmd,
-                        Err(e) => {
-                            println!("Failed to start component {}: {}", &self.id, e);
-                            return;
-                        }
-                    };
+        // Get command information
+        let mut components = components.lock().await;
+        let component = components.get_mut(&id).unwrap();
+        let network = component.network;
+        drop(components);
+
+        tokio::spawn(async move {
+            match network {
+                true => {
+                    // TODO
+                }
+                false => {
+                    loop {
+                        // Create new command
+                        let cmd = match tokio::process::Command::new(command.clone())
+                            .args(args.clone())
+                            .stdout(Stdio::piped())
+                            .stdin(Stdio::piped())
+                            .spawn()
+                        {
+                            Ok(cmd) => cmd,
+                            Err(e) => {
+                                println!("Failed to start component {}: {}", id, e);
+                                return;
+                            }
+                        };
+                    }
                 }
             }
-        }
+        });
     }
 }
 
