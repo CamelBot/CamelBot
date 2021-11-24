@@ -11,3 +11,4 @@ serde = { version = "*", features = ["derive"] }
 serde_json = { version = "*" }
 dialoguer = { version = "*" }
 ansi_term = { version = "*" }
+async-trait = { version = "*" }

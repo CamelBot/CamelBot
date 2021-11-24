@@ -7,9 +7,11 @@
 // 2 - Sniffer: it takes every packet before reaching its source and modifies it or drops it
 // Note: a sniffer should not be used unless needed because it can be very slow
 
+use async_trait::async_trait;
 use std::{collections::HashMap, process::Stdio, sync::Arc};
 
 use tokio::{
+    io::{AsyncBufReadExt, BufReader},
     net::{
         tcp::{ReadHalf, WriteHalf},
         TcpStream,
@@ -56,13 +58,20 @@ impl Component {
     }
 
     pub async fn run(
-        &mut self,
-        reader: &impl ComponentRead,
-        writer: &impl ComponentWrite,
-        receiver: UnboundedReceiver<Packet>,
+        id: String,
+        reader: impl ComponentRead,
+        writer: impl ComponentWrite,
+        components: Arc<Mutex<HashMap<String, Component>>>,
+        receiver: &UnboundedReceiver<Packet>,
     ) -> bool // Should the component be automatically restarted on exit
     {
-        //
+        let mut reader = reader;
+        let mut writer = writer;
+        tokio::select! {
+            _ = reader.read() => {
+                println!("Yay recieved crap");
+            }
+        }
         false
     }
     pub async fn connect(
@@ -73,6 +82,7 @@ impl Component {
         receiver: UnboundedReceiver<Packet>,
     ) {
         // Get command information
+        let cloned_components = components.clone();
         let mut components = components.lock().await;
         let component = components.get_mut(&id).unwrap();
         let network = component.network;
@@ -86,7 +96,7 @@ impl Component {
                 false => {
                     loop {
                         // Create new command
-                        let cmd = match tokio::process::Command::new(command.clone())
+                        let mut cmd = match tokio::process::Command::new(command.clone())
                             .args(args.clone())
                             .stdout(Stdio::piped())
                             .stdin(Stdio::piped())
@@ -98,6 +108,21 @@ impl Component {
                                 return;
                             }
                         };
+
+                        let stdin = cmd.stdin.take().unwrap();
+                        let stdout = cmd.stdout.take().unwrap();
+                        let stdout = BufReader::new(stdout);
+                        if !Component::run(
+                            id.clone(),
+                            stdout,
+                            stdin,
+                            cloned_components.clone(),
+                            &receiver,
+                        )
+                        .await
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -105,10 +130,25 @@ impl Component {
     }
 }
 
-pub trait ComponentRead {}
-impl ComponentRead for ReadHalf<'_> {}
-impl ComponentRead for ChildStdin {}
+#[async_trait]
+pub trait ComponentRead {
+    async fn read(&mut self) -> String;
+}
+#[async_trait]
+impl ComponentRead for ReadHalf<'_> {
+    async fn read(&mut self) -> String {
+        todo!()
+    }
+}
+#[async_trait]
+impl ComponentRead for BufReader<ChildStdout> {
+    async fn read(&mut self) -> String {
+        let mut buf = String::new();
+        self.read_line(&mut buf).await.unwrap();
+        buf
+    }
+}
 
 pub trait ComponentWrite {}
 impl ComponentWrite for WriteHalf<'_> {}
-impl ComponentWrite for ChildStdout {}
+impl ComponentWrite for ChildStdin {}

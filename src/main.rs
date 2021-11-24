@@ -75,4 +75,5 @@ async fn main() {
     // UI loop yeet
     // This is now blocking to stop the program from exiting
     //ui::ui(cloned_arc, cloned_plugin_arc, kill_tx, cloned_tx).await;
+    loop {}
 }
