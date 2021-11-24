@@ -32,7 +32,7 @@ impl Component {
     /// Creates a new component
     /// # Arguments
     /// * `id` - The ID of the component
-    /// * `type_` - The type of the component
+    /// * `type_` - The type of the component: 0 - Interface, 1 - Plugin, 2 - Sniffer
     /// * `network` - Whether the component communicates over TCP
     /// * `key` - The key used to authenticate with the component if over TCP
     /// * `sender` - The sender to send packets to the component
@@ -50,16 +50,22 @@ impl Component {
         }
     }
 
-    pub async fn run_stdio(
+    pub async fn run(
         &mut self,
-        reader: &dyn ComponentRead,
-        writer: &dyn ComponentWrite,
+        reader: &impl ComponentRead,
+        writer: &impl ComponentWrite,
         receiver: UnboundedReceiver<Packet>,
-    ) {
+    ) -> bool // Should the component be automatically restarted on exit
+    {
+        //
+        false
     }
 }
 
 pub trait ComponentRead {}
 impl ComponentRead for ReadHalf<'_> {}
+impl ComponentRead for ChildStdin {}
 
 pub trait ComponentWrite {}
+impl ComponentWrite for WriteHalf<'_> {}
+impl ComponentWrite for ChildStdout {}
