@@ -43,23 +43,9 @@ async fn main() {
         }
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let mut comp = component::Component::new(i.name.clone(), 0, i.key.clone(), tx);
-
-        // Run a new command
-        let mut cmd = match tokio::process::Command::new("ls")
-            .stdout(std::process::Stdio::piped())
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-        {
-            Ok(cmd) => cmd,
-            Err(e) => {
-                println!("Failed to start interface {}: {}", i.name, e);
-                continue;
-            }
-        };
-        let stdin = cmd.stdin.take().unwrap();
-        let stdout = cmd.stdout.take().unwrap();
-
-        comp.run(&stdin, &stdout, rx).await;
+        let command = i.command.split(" ").collect::<Vec<&str>>()[0];
+        let args = i.command.split(" ").skip(1).collect::<Vec<&str>>();
+        comp.connect(command, args, rx).await;
     }
 
     if config.tcp {

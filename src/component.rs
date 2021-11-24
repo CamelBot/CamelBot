@@ -7,6 +7,8 @@
 // 2 - Sniffer: it takes every packet before reaching its source and modifies it or drops it
 // Note: a sniffer should not be used unless needed because it can be very slow
 
+use std::process::Stdio;
+
 use tokio::{
     net::{
         tcp::{ReadHalf, WriteHalf},
@@ -59,6 +61,35 @@ impl Component {
     {
         //
         false
+    }
+    pub async fn connect(
+        &mut self,
+        command: &str,
+        args: Vec<&str>,
+        receiver: UnboundedReceiver<Packet>,
+    ) {
+        match self.network {
+            true => {
+                //
+            }
+            false => {
+                loop {
+                    // Create new command
+                    let mut cmd = match tokio::process::Command::new(command)
+                        .args(args.clone())
+                        .stdout(Stdio::piped())
+                        .stdin(Stdio::piped())
+                        .spawn()
+                    {
+                        Ok(cmd) => cmd,
+                        Err(e) => {
+                            println!("Failed to start component {}: {}", &self.id, e);
+                            return;
+                        }
+                    };
+                }
+            }
+        }
     }
 }
 
