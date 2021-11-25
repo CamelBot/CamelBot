@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use serde_json;
 use std::{collections::HashMap, process::Stdio, sync::Arc};
 use tokio::{
-    io::{AsyncBufReadExt, BufReader},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::tcp::{ReadHalf, WriteHalf},
     process::{ChildStdin, ChildStdout},
     sync::{
@@ -20,7 +20,7 @@ use tokio::{
     },
 };
 
-use crate::packet::Packet;
+use crate::{commands::Command, packet::Packet};
 
 pub struct Component {
     pub id: String,    // An ID that can be referenced by other components
@@ -59,6 +59,7 @@ impl Component {
         command: String,
         args: Vec<String>,
         components: Arc<Mutex<HashMap<String, Component>>>,
+        commands: Arc<Mutex<Vec<Command>>>,
         receiver: UnboundedReceiver<Packet>,
     ) {
         // Get command information
@@ -98,6 +99,7 @@ impl Component {
                             stdout,
                             stdin,
                             cloned_components.clone(),
+                            commands.clone(),
                             receiver,
                         )
                         .await;
@@ -125,6 +127,7 @@ impl Component {
         reader: impl ComponentRead,
         writer: impl ComponentWrite,
         components: Arc<Mutex<HashMap<String, Component>>>,
+        commands: Arc<Mutex<Vec<Command>>>,
         receiver: UnboundedReceiver<Packet>,
     ) -> (bool, UnboundedReceiver<Packet>) // Should the component be automatically restarted on exit
     {
@@ -132,6 +135,10 @@ impl Component {
         let mut reader = reader;
         let mut writer = writer;
         let mut receiver = receiver;
+
+        // We are caching components to avoid bottleknecks and unecessary locks
+        let mut component_cache = cache_components(components.clone()).await;
+
         loop {
             tokio::select! {
                 msg = reader.read() => {
@@ -151,15 +158,52 @@ impl Component {
                             continue;
                         }
                     };
-                    if packet.data == "kill" {
-                        break;
+                    match packet.data.as_str() {
+                        "kill" => {
+                            return(false, receiver);
+                        }
+                        "restart" => {
+                            return(true, receiver);
+                        }
+                        "intent update" => {
+                            component_cache = cache_components(components.clone()).await;
+                        }
+                        _ => {
+                            // Write packet to component
+                            writer.write(packet.data).await;
+                        }
                     }
+
                 }
             }
         }
-
-        (false, receiver)
     }
+}
+
+impl Clone for Component {
+    fn clone(&self) -> Self {
+        Component {
+            id: self.id.clone(),
+            type_: self.type_,
+            network: self.network,
+            key: self.key.clone(),
+            sender: self.sender.clone(),
+            intents: self.intents.clone(),
+            gucci: self.gucci,
+        }
+    }
+}
+
+pub async fn cache_components(
+    components: Arc<Mutex<HashMap<String, Component>>>,
+) -> HashMap<String, Component> {
+    let components = components.lock().await;
+    let mut component_cache = HashMap::new();
+    for (k, v) in components.iter() {
+        component_cache.insert(k.clone(), v.clone());
+    }
+    drop(components);
+    component_cache
 }
 
 #[async_trait]
@@ -181,6 +225,20 @@ impl ComponentRead for BufReader<ChildStdout> {
     }
 }
 
-pub trait ComponentWrite {}
-impl ComponentWrite for WriteHalf<'_> {}
-impl ComponentWrite for ChildStdin {}
+#[async_trait]
+pub trait ComponentWrite {
+    async fn write(&mut self, msg: String);
+}
+#[async_trait]
+impl ComponentWrite for WriteHalf<'_> {
+    async fn write(&mut self, _msg: String) {
+        todo!()
+    }
+}
+#[async_trait]
+impl ComponentWrite for ChildStdin {
+    async fn write(&mut self, msg: String) {
+        self.write_all(msg.as_bytes()).await.unwrap();
+        self.flush().await.unwrap();
+    }
+}

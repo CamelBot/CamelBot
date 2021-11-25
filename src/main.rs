@@ -5,7 +5,7 @@
 use std::{collections::HashMap, sync::Arc};
 use tokio::{fs::File, sync::Mutex};
 
-use crate::{commands::Command, component::Component};
+use crate::component::Component;
 
 mod commands;
 mod component;
@@ -64,6 +64,7 @@ async fn main() {
             command.to_string(),
             args,
             component_arc.clone(),
+            command_arc.clone(),
             rx,
         )
         .await;
