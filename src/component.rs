@@ -20,7 +20,10 @@ use tokio::{
     },
 };
 
-use crate::{commands::Command, packet::Packet};
+use crate::{
+    commands::{self, Command},
+    packet::Packet,
+};
 
 pub struct Component {
     pub id: String,    // An ID that can be referenced by other components
@@ -167,6 +170,9 @@ impl Component {
                         }
                         "intent update" => {
                             component_cache = cache_components(components.clone()).await;
+                        }
+                        "command update" => {
+                            writer.write(commands::create_packet(commands.lock().await)).await;
                         }
                         _ => {
                             // Write packet to component
