@@ -8,15 +8,12 @@
 // Note: a sniffer should not be used unless needed because it can be very slow
 
 use async_trait::async_trait;
+use serde_json;
 use std::{collections::HashMap, process::Stdio, sync::Arc};
-
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
-    net::{
-        tcp::{ReadHalf, WriteHalf},
-        TcpStream,
-    },
-    process::{Child, ChildStdin, ChildStdout},
+    net::tcp::{ReadHalf, WriteHalf},
+    process::{ChildStdin, ChildStdout},
     sync::{
         mpsc::{UnboundedReceiver, UnboundedSender},
         Mutex,
@@ -131,17 +128,36 @@ impl Component {
         receiver: UnboundedReceiver<Packet>,
     ) -> (bool, UnboundedReceiver<Packet>) // Should the component be automatically restarted on exit
     {
+        println!("{} has started", id);
         let mut reader = reader;
         let mut writer = writer;
         let mut receiver = receiver;
-        tokio::select! {
-            msg = reader.read() => {
-                println!("Yay recieved crap");
-            }
-            _ = receiver.recv() => {
-                println!("Yay recieved packet");
+        loop {
+            tokio::select! {
+                msg = reader.read() => {
+                    // Attempt to parse msg as JSON
+                    let msg = match serde_json::from_str::<serde_json::Value>(&msg) {
+                        Ok(msg) => msg,
+                        _ => {
+                            continue;
+                        }
+                    };
+
+                }
+                packet = receiver.recv() => {
+                    let packet = match packet {
+                        Some(packet) => packet,
+                        None => {
+                            continue;
+                        }
+                    };
+                    if packet.data == "kill" {
+                        break;
+                    }
+                }
             }
         }
+
         (false, receiver)
     }
 }

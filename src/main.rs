@@ -7,6 +7,7 @@ use tokio::sync::Mutex;
 
 use crate::component::Component;
 
+mod commands;
 mod component;
 mod config;
 mod constants;
@@ -31,9 +32,10 @@ async fn main() {
         }
     };
 
-    // Create arc of UnboundedSender for components
+    // Component Arc
     let component_arc: Arc<Mutex<HashMap<String, Component>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    // Command Arc
 
     // Start componenents
     for i in config.interfaces.iter() {
