@@ -20,7 +20,7 @@ use tokio::{
     },
 };
 
-use crate::{intents::Intent, packet::Packet};
+use crate::packet::Packet;
 
 pub struct Component {
     pub id: String,    // An ID that can be referenced by other components
@@ -28,7 +28,7 @@ pub struct Component {
     pub network: bool, // Whether the component communicates over TCP. If false, it communicates over STDIN/STDOUT
     pub key: String,   // The key used to authenticate with the component if over TCP
     pub sender: UnboundedSender<Packet>,
-    pub intents: Vec<Intent>,
+    pub intents: Vec<String>, // The events that the component wants to receive
     pub gucci: bool,
 }
 

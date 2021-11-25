@@ -3,15 +3,14 @@
 // All hail camels
 
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::{fs::File, sync::Mutex};
 
-use crate::component::Component;
+use crate::{commands::Command, component::Component};
 
 mod commands;
 mod component;
 mod config;
 mod constants;
-mod intents;
 mod interface;
 mod packet;
 mod plugin;
@@ -35,7 +34,13 @@ async fn main() {
     // Component Arc
     let component_arc: Arc<Mutex<HashMap<String, Component>>> =
         Arc::new(Mutex::new(HashMap::new()));
+
     // Command Arc
+    let file = File::open("./command_cache.json").await;
+    let command_arc = match file {
+        Ok(_) => Arc::new(Mutex::new(commands::load_cache().await)),
+        Err(_) => Arc::new(Mutex::new(Vec::new())),
+    };
 
     // Start componenents
     for i in config.interfaces.iter() {
