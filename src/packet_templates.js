@@ -33,7 +33,6 @@ _ = [
     // All these fields are required, but are only read in certain circumstances
     {
         type: "intents",
-        component: 0, // 0 - Interface, 1 - Plugin, 2 - Sniffer
         events: ["message", "explosion", "yeet", "channel_create"], // These only matter for plugins
         commands: [{
             name: "fancycommand",
