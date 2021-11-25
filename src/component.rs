@@ -26,8 +26,8 @@ use crate::{
 };
 
 pub struct Component {
-    pub id: String,    // An ID that can be referenced by other components
-    pub type_: u8,     // 0 - Interface, 1 - Plugin, 2 - Sniffer
+    pub id: String,         // An ID that can be referenced by other components
+    pub component_type: u8, // 0 - Interface, 1 - Plugin, 2 - Sniffer
     pub network: bool, // Whether the component communicates over TCP. If false, it communicates over STDIN/STDOUT
     pub key: String,   // The key used to authenticate with the component if over TCP
     pub sender: UnboundedSender<Packet>,
@@ -48,7 +48,7 @@ impl Component {
         // Create the component
         Component {
             id,
-            type_,
+            component_type: type_,
             network: if key == "" { false } else { true },
             key,
             sender,
@@ -138,6 +138,7 @@ impl Component {
         let mut reader = reader;
         let mut writer = writer;
         let mut receiver = receiver;
+        let component_type = components.lock().await.get(&id).unwrap().component_type;
 
         // We are caching components to avoid bottleknecks and unecessary locks
         let mut component_cache = cache_components(components.clone()).await;
@@ -152,6 +153,108 @@ impl Component {
                             continue;
                         }
                     };
+                    let packet_type = match msg["type"].as_str() {
+                        Some(type_) => type_,
+                        _ => {
+                            continue;
+                        }
+                    };
+                    match packet_type {
+                        "event" => {
+                            // Get list of sniffers
+                            let mut sniffers = vec![];
+                            for (v, k) in component_cache.iter_mut() {
+                                if k.component_type == 2 {
+                                    sniffers.push(v.clone());
+                                }
+                            }
+                            let to_send = crate::packet::Packet {
+                                source: id.clone(),
+                                destination: "".to_string(),
+                                event: msg["event"].to_string(),
+                                data: msg.to_string(),
+                                sniffers: sniffers.clone(),
+                            };
+
+                            if sniffers.len() > 0 {
+                                // Send packet to the first sniffer
+                                let sniffer = sniffers.remove(0);
+                                match component_cache.get_mut(&sniffer).unwrap().sender.send(to_send) {
+                                    _ => {} // Don't care
+                                }
+                            } else {
+                                // Broadcast the event to all components that want it
+                                for (_, k) in component_cache.iter_mut() {
+                                    if k.intents.contains(&msg["event"].to_string()) {
+                                        match k.sender.send(to_send.clone()) {
+                                            _ => {} // Don't care
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "sniffer" => {
+                            // Reconstruct the packet
+                            // Determine if there are any more sniffers to send to
+                            // If there are, send the packet to the next sniffer
+                            // If not, either broadcast the event or send the packet to the destination
+                            todo!();
+                        }
+                        "intents" => {
+                            // Get the events
+                            let events: Vec<String> = match msg["events"].as_array() {
+                                Some(events) => {
+                                    let mut to_return: Vec<String> = vec![];
+                                    for event in events {
+                                        to_return.push(event.as_str().unwrap().to_string());
+                                    }
+                                    to_return
+                                }
+                                _ => {
+                                    continue;
+                                }
+                            };
+
+                            let mut found_commands: Vec<Command> = match msg["commands"].as_array() {
+                                Some(cmds) => {
+                                    let mut to_return: Vec<Command> = vec![];
+                                    for i in cmds {
+                                        to_return.push(match serde_json::from_value(i.clone()) {
+                                            Ok(value) => value,
+                                            _ => {
+                                                continue;
+                                            }
+                                        })
+                                    }
+                                    to_return
+                                },
+                                None => continue,
+                            };
+                            // Put the events in the arc
+                            let mut lock = commands.lock().await;
+                            lock.append(&mut found_commands);
+                            let mut lock = components.lock().await;
+                            lock.get_mut(&id).unwrap().intents = events;
+                            drop(lock);
+                            // Send an update packet to each component
+                            for (_, k) in component_cache.iter_mut() {
+                                match k.sender.send(Packet {
+                                    source: id.clone(),
+                                    destination: "".to_string(),
+                                    event: "".to_string(),
+                                    data: "update".to_string(),
+                                    sniffers: vec![],
+                                }) {
+                                    _ => {} // Don't care
+                                }
+                            }
+
+
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
 
                 }
                 packet = receiver.recv() => {
@@ -168,15 +271,33 @@ impl Component {
                         "restart" => {
                             return(true, receiver);
                         }
-                        "intent update" => {
+                        "update" => {
                             component_cache = cache_components(components.clone()).await;
-                        }
-                        "command update" => {
                             writer.write(commands::create_packet(commands.lock().await)).await;
                         }
                         _ => {
-                            // Write packet to component
-                            writer.write(packet.data).await;
+                            if component_type == 2 {
+                                // We do be a sniffer
+                                let mut sniffers = packet.sniffers.clone();
+                                // Remove self from sniffers
+                                let index = sniffers.iter().position(|x| x == &id).unwrap();
+                                sniffers.remove(index);
+
+                                let to_send = crate::packet::SnifferPacket {
+                                    type_: "sniffer".to_string(),
+                                    source: packet.source,
+                                    destination: packet.destination,
+                                    event: packet.event,
+                                    sniffers,
+                                    packet: packet.data,
+                                };
+                                // Convert to JSON
+                                let to_send = serde_json::to_string(&to_send).unwrap();
+                                writer.write(to_send).await;
+
+                            } else{
+                                writer.write(packet.data).await;
+                            }
                         }
                     }
 
@@ -190,7 +311,7 @@ impl Clone for Component {
     fn clone(&self) -> Self {
         Component {
             id: self.id.clone(),
-            type_: self.type_,
+            component_type: self.component_type,
             network: self.network,
             key: self.key.clone(),
             sender: self.sender.clone(),
@@ -244,6 +365,7 @@ impl ComponentWrite for WriteHalf<'_> {
 #[async_trait]
 impl ComponentWrite for ChildStdin {
     async fn write(&mut self, msg: String) {
+        let msg = msg.replace("type_", "type");
         self.write_all(msg.as_bytes()).await.unwrap();
         self.flush().await.unwrap();
     }

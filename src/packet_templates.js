@@ -1,5 +1,6 @@
 // jkcoxson
 // Packet templates, serving as a lazy API doc
+console.log("This file is not meant to be run");
 
 _ = [
     // All packets are formated as JSON objects
@@ -56,6 +57,20 @@ _ = [
         source: "fancy interface", // The name of the interface that sent the command
         // Any fields after this are up to the interface to define
         data: "anything can go here, the plugin must know what to expect"
+    },
+
+    // Sniffer packets
+    // These packets are sent if the component is a sniffer
+    // This packet must be returned to the core for it to be passed on to the destination component
+    // If it is not returned, the packet will be dropped
+    {
+        type: "sniffer",
+        source: "interface_1",
+        destination: "interface_2",
+        event: "",
+        sniffers: [], // No touchy, the core manages this. It is kept here for multi-threaded purposes.
+        packet: {} // The entire packet 
+        // The packet may be mutilated or dropped, depending on the purpose of the sniffer
     }
 
 ]

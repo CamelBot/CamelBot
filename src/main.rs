@@ -5,7 +5,7 @@
 use std::{collections::HashMap, sync::Arc};
 use tokio::{fs::File, sync::Mutex};
 
-use crate::component::Component;
+use crate::{component::Component, packet::Packet};
 
 mod commands;
 mod component;
@@ -53,6 +53,18 @@ async fn main() {
 
         // Insert component into map
         component_arc.lock().await.insert(i.name.clone(), comp);
+        // Notify each component of an update
+        for j in component_arc.lock().await.values() {
+            match j.sender.send(Packet {
+                source: "".to_string(),
+                destination: "".to_string(),
+                event: "".to_string(),
+                data: "update".to_string(),
+                sniffers: vec![],
+            }) {
+                _ => {} // Don't care
+            }
+        }
 
         // Start component
         let command = i.command.split(" ").collect::<Vec<&str>>()[0];
