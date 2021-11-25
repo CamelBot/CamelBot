@@ -57,23 +57,6 @@ impl Component {
         }
     }
 
-    pub async fn run(
-        id: String,
-        reader: impl ComponentRead,
-        writer: impl ComponentWrite,
-        components: Arc<Mutex<HashMap<String, Component>>>,
-        receiver: &UnboundedReceiver<Packet>,
-    ) -> bool // Should the component be automatically restarted on exit
-    {
-        let mut reader = reader;
-        let mut writer = writer;
-        tokio::select! {
-            _ = reader.read() => {
-                println!("Yay recieved crap");
-            }
-        }
-        false
-    }
     pub async fn connect(
         id: String,
         command: String,
@@ -89,6 +72,7 @@ impl Component {
         drop(components);
 
         tokio::spawn(async move {
+            let mut receiver = receiver;
             match network {
                 true => {
                     // TODO
@@ -112,21 +96,53 @@ impl Component {
                         let stdin = cmd.stdin.take().unwrap();
                         let stdout = cmd.stdout.take().unwrap();
                         let stdout = BufReader::new(stdout);
-                        if !Component::run(
+                        let (rep, rec) = Component::run(
                             id.clone(),
                             stdout,
                             stdin,
                             cloned_components.clone(),
-                            &receiver,
+                            receiver,
                         )
-                        .await
-                        {
+                        .await;
+                        if !rep {
                             break;
                         }
+                        receiver = rec;
                     }
                 }
             }
         });
+    }
+
+    /// Runs the component chain
+    /// # Arguments
+    /// * `id` - The ID of the component
+    /// * `reader` - The reader to read from the component
+    /// * `writer` - The writer to write to the component
+    /// * `components` - The components to send packets to
+    /// * `receiver` - The receiver to receive packets from other components
+    /// # Returns
+    /// * `(bool, UnboundedReceiver<Packet>)` - Whether the component should continue running and the receiver to receive packets from other components
+    pub async fn run(
+        id: String,
+        reader: impl ComponentRead,
+        writer: impl ComponentWrite,
+        components: Arc<Mutex<HashMap<String, Component>>>,
+        receiver: UnboundedReceiver<Packet>,
+    ) -> (bool, UnboundedReceiver<Packet>) // Should the component be automatically restarted on exit
+    {
+        let mut reader = reader;
+        let mut writer = writer;
+        let mut receiver = receiver;
+        tokio::select! {
+            msg = reader.read() => {
+                println!("Yay recieved crap");
+            }
+            _ = receiver.recv() => {
+                println!("Yay recieved packet");
+            }
+        }
+        (false, receiver)
     }
 }
 
