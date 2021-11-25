@@ -11,9 +11,7 @@ mod commands;
 mod component;
 mod config;
 mod constants;
-mod interface;
 mod packet;
-mod plugin;
 mod ui;
 
 #[tokio::main]
