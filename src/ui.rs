@@ -17,6 +17,13 @@ pub async fn ui(
         match main_menu().await.as_str() {
             "Add Component" => {
                 let constructor = new_component().await;
+                let constructor = match constructor {
+                    Some(constructor) => constructor,
+                    None => {
+                        println!("Canceled");
+                        continue;
+                    }
+                };
                 create_interface(
                     &constructor,
                     component_arc.clone(),
@@ -111,30 +118,39 @@ async fn main_menu() -> String {
     .unwrap()
 }
 
-async fn new_component() -> config::ComponentConstructor {
+async fn new_component() -> Option<config::ComponentConstructor> {
     tokio::task::spawn_blocking(move || {
-        let type_options = vec!["Interface", "Plugin", "Sniffer"];
+        let type_options = vec!["Interface", "Plugin", "Sniffer", "Cancel"];
         let type_ = Select::with_theme(&ColorfulTheme::default())
             .with_prompt("Choose what type of component")
             .items(&type_options)
+            .default(3)
             .interact()
             .unwrap();
+        if type_ == 3 {
+            return None;
+        }
         let plugin_name = dialoguer::Input::<String>::new()
             .with_prompt("Component name")
             .interact()
             .unwrap();
+        if plugin_name.len() < 2 {
+            return None;
+        }
         let command = dialoguer::Input::<String>::new()
             .with_prompt("Command to launch component")
             .interact()
             .unwrap();
-
-        config::ComponentConstructor {
+        if command.len() < 2 {
+            return None;
+        }
+        Some(config::ComponentConstructor {
             name: plugin_name,
             command: command,
             type_: type_.try_into().unwrap(),
             network: false,
             key: "".to_string(),
-        }
+        })
     })
     .await
     .unwrap()
