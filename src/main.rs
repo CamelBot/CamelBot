@@ -2,6 +2,8 @@
 // jkcoxson
 // All hail camels
 
+use commands::Command;
+use config::ComponentConstructor;
 use std::{collections::HashMap, sync::Arc};
 use tokio::{fs::File, sync::Mutex};
 
@@ -12,7 +14,7 @@ mod component;
 mod config;
 mod constants;
 mod packet;
-//mod ui;
+mod ui;
 
 #[tokio::main]
 async fn main() {
@@ -42,45 +44,11 @@ async fn main() {
 
     // Start componenents
     for i in config.components.iter() {
-        if i.network && !config.tcp {
-            println!("Interface {} is configured for network mode, but TCP mode is not enabled. It will not be loaded.", i.name);
-            continue;
-        }
-
-        // Create component
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        let comp = component::Component::new(i.name.clone(), 0, i.key.clone(), tx);
-
-        // Insert component into map
-        component_arc.lock().await.insert(i.name.clone(), comp);
-        // Notify each component of an update
-        for j in component_arc.lock().await.values() {
-            if j.id == i.name {
-                continue;
-            }
-            match j.sender.send(Packet {
-                source: "".to_string(),
-                destination: "".to_string(),
-                event: "".to_string(),
-                data: "update".to_string(),
-                sniffers: vec![],
-            }) {
-                _ => {} // Don't care
-            }
-        }
-
-        // Start component
-        let command = i.command.split(" ").collect::<Vec<&str>>()[0];
-        let args = i.command.split(" ").skip(1).collect::<Vec<&str>>();
-        let args: Vec<String> = args.iter().map(|x| x.to_string()).collect();
-
-        component::Component::connect(
-            i.name.clone(),
-            command.to_string(),
-            args,
+        create_interface(
+            i,
             component_arc.clone(),
             command_arc.clone(),
-            rx,
+            config.clone(),
         )
         .await;
     }
@@ -95,6 +63,54 @@ async fn main() {
 
     // UI loop yeet
     // This is now blocking to stop the program from exiting
-    //ui::ui(cloned_arc, cloned_plugin_arc, kill_tx, cloned_tx).await;
-    loop {}
+    ui::ui(component_arc.clone(), command_arc.clone(), config).await;
+}
+
+pub async fn create_interface(
+    i: &ComponentConstructor,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+    command_arc: Arc<Mutex<Vec<Command>>>,
+    config: config::Config,
+) {
+    if i.network && !config.tcp {
+        println!("Interface {} is configured for network mode, but TCP mode is not enabled. It will not be loaded.", i.name);
+        return;
+    }
+
+    // Create component
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let comp = component::Component::new(i.name.clone(), 0, i.key.clone(), tx);
+
+    // Insert component into map
+    component_arc.lock().await.insert(i.name.clone(), comp);
+    // Notify each component of an update
+    for j in component_arc.lock().await.values() {
+        if j.id == i.name {
+            continue;
+        }
+        match j.sender.send(Packet {
+            source: "".to_string(),
+            destination: "".to_string(),
+            event: "".to_string(),
+            data: "update".to_string(),
+            sniffers: vec![],
+        }) {
+            _ => {} // Don't care
+        }
+    }
+
+    // Start component
+    let command = i.command.split(" ").collect::<Vec<&str>>()[0];
+    let args = i.command.split(" ").skip(1).collect::<Vec<&str>>();
+    let args: Vec<String> = args.iter().map(|x| x.to_string()).collect();
+
+    component::Component::connect(
+        i.name.clone(),
+        command.to_string(),
+        args,
+        component_arc.clone(),
+        command_arc.clone(),
+        rx,
+    )
+    .await;
 }

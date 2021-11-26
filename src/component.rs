@@ -106,7 +106,23 @@ impl Component {
                             receiver,
                         )
                         .await;
+                        cmd.kill().await.unwrap();
                         if !rep {
+                            // Remove self from components
+                            let mut components = cloned_components.lock().await;
+                            components.remove(&id);
+                            // Notify other components of the change
+                            for (_, v) in components.iter_mut() {
+                                match v.sender.send(Packet {
+                                    source: id.clone(),
+                                    destination: "".to_string(),
+                                    event: "".to_string(),
+                                    data: "update".to_string(),
+                                    sniffers: vec![],
+                                }) {
+                                    _ => {} // Don't care
+                                }
+                            }
                             break;
                         }
                         receiver = rec;
@@ -209,7 +225,6 @@ impl Component {
                                 }
                             };
 
-                            println!("got here 2");
                             // Get the sniffers
                             let mut sniffers = vec![];
                             for (v, k) in component_cache.iter_mut() {
@@ -286,8 +301,8 @@ impl Component {
                             lock.get_mut(&id).unwrap().intents = events;
                             drop(lock);
                             // Send an update packet to each component
-                            for (_, k) in component_cache.iter_mut() {
-                                match k.sender.send(Packet {
+                            for (_, v) in component_cache.iter_mut() {
+                                match v.sender.send(Packet {
                                     source: id.clone(),
                                     destination: "".to_string(),
                                     event: "".to_string(),
@@ -297,8 +312,8 @@ impl Component {
                                     _ => {} // Don't care
                                 }
                             }
-
-
+                            // Save the command cache
+                            commands::save_cache(commands.lock().await.to_vec()).await;
                         }
                         _ => {
                             continue;
@@ -313,12 +328,11 @@ impl Component {
                             continue;
                         }
                     };
-                    println!("{} received packet {}", id, packet.data);
                     match packet.data.as_str() {
                         "kill" => {
                             return(false, receiver);
                         }
-                        "restart" => {
+                        "reload" => {
                             return(true, receiver);
                         }
                         "update" => {
