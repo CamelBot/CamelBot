@@ -27,6 +27,10 @@ pub async fn ui(
             }
             "Remove Component" => {
                 let target = choose_component(component_arc.clone()).await;
+                let target = match target {
+                    Some(target) => target,
+                    None => continue,
+                };
                 // Send kill to component
                 let mut lock = component_arc.lock().await;
                 match lock.get_mut(&target).unwrap().sender.send(Packet {
@@ -45,6 +49,10 @@ pub async fn ui(
             }
             "Reload Component" => {
                 let target = choose_component(component_arc.clone()).await;
+                let target = match target {
+                    Some(target) => target,
+                    None => continue,
+                };
                 // Send kill to component
                 let mut lock = component_arc.lock().await;
                 match lock.get_mut(&target).unwrap().sender.send(Packet {
@@ -132,17 +140,21 @@ async fn new_component() -> config::ComponentConstructor {
     .unwrap()
 }
 
-async fn choose_component(components: Arc<Mutex<HashMap<String, Component>>>) -> String {
+async fn choose_component(components: Arc<Mutex<HashMap<String, Component>>>) -> Option<String> {
     let options = components
         .lock()
         .await
         .keys()
         .cloned()
         .collect::<Vec<String>>();
+    if options.len() == 0 {
+        println!("No components to choose from");
+        return None;
+    }
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select a component")
         .items(&options)
         .interact()
         .unwrap();
-    options[selection].to_string()
+    Some(options[selection].to_string())
 }
