@@ -79,6 +79,13 @@ _ = [
         sniffers: [], // No touchy, the core manages this. It is kept here for multi-threaded purposes.
         packet: {} // The entire packet 
         // The packet may be mutilated or dropped, depending on the purpose of the sniffer
+    },
+
+    // Debug packets
+    // These packets are sent to the core to print to the console
+    {
+        type: "debug",
+        message: "This is a debug message",
     }
 
 ]

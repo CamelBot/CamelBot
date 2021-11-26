@@ -216,7 +216,7 @@ impl Component {
                                     }
                                 }
                             }
-                        },
+                        }
                         "send" => {
                             // Get the destination
                             let destination = match msg["target"].as_str() {
@@ -256,8 +256,7 @@ impl Component {
                                     }
                                 }
                             }
-                        },
-
+                        }
                         "sniffer" => {
                             // Reconstruct the packet
                             // Determine if there are any more sniffers to send to
@@ -348,6 +347,16 @@ impl Component {
                                 }
                             }
 
+                        }
+                        "debug" => {
+                            // Get the debug message
+                            let debug_message = match msg["message"].as_str() {
+                                Some(message) => message,
+                                _ => {
+                                    continue;
+                                }
+                            };
+                            println!("{}", debug_message);
                         }
                         _ => {
                             continue;

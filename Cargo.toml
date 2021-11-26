@@ -12,3 +12,5 @@ serde_json = { version = "*" }
 dialoguer = { version = "*" }
 ansi_term = { version = "*" }
 async-trait = { version = "*" }
+crossterm = { version = "*" }
+tui = { version = "*" }

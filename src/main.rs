@@ -63,7 +63,8 @@ async fn main() {
 
     // UI loop yeet
     // This is now blocking to stop the program from exiting
-    ui::ui(component_arc.clone(), command_arc.clone(), config).await;
+    //ui::ui(component_arc.clone(), command_arc.clone(), config).await;
+    ui::tui().await;
 }
 
 pub async fn create_interface(

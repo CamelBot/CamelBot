@@ -3,6 +3,14 @@
 use dialoguer::{theme::ColorfulTheme, Select};
 use std::{collections::HashMap, convert::TryInto, sync::Arc};
 use tokio::sync::Mutex;
+use tui::text::Text;
+
+use std::io;
+use termion::raw::IntoRawMode;
+use tui::backend::TermionBackend;
+use tui::layout::{Constraint, Direction, Layout};
+use tui::widgets::{Block, Borders, Paragraph, Widget};
+use tui::Terminal;
 
 use crate::{commands::Command, component::Component, config, create_interface, packet::Packet};
 
@@ -173,4 +181,24 @@ async fn choose_component(components: Arc<Mutex<HashMap<String, Component>>>) ->
         .interact()
         .unwrap();
     Some(options[selection].to_string())
+}
+
+pub async fn tui() {
+    let stdout = io::stdout().into_raw_mode().unwrap();
+    let backend = TermionBackend::new(stdout);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+                .split(f.size());
+
+            let block = Block::default().title("Block").borders(Borders::ALL);
+            f.render_widget(block, chunks[0]);
+            let block = Block::default().title("Block 2").borders(Borders::ALL);
+            f.render_widget(block, chunks[1]);
+        })
+        .unwrap();
+    loop {}
 }
