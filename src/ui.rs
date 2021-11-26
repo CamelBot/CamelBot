@@ -1,94 +1,82 @@
 // jkcoxson
 
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::{mpsc::UnboundedSender, Mutex};
-
-use ansi_term::Style;
 use dialoguer::{theme::ColorfulTheme, Select};
+use std::{collections::HashMap, convert::TryInto, sync::Arc};
+use tokio::sync::Mutex;
 
-use crate::{config, create_stdin_interface, create_stdin_plugin};
+use crate::{commands::Command, component::Component, config, create_interface, packet::Packet};
 
 pub async fn ui(
-    interface_arc: Arc<Mutex<HashMap<String, UnboundedSender<String>>>>,
-    plugin_arc: Arc<Mutex<HashMap<String, UnboundedSender<String>>>>,
-    kill_switch: UnboundedSender<()>,
-    tx: UnboundedSender<String>,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+    command_arc: Arc<Mutex<Vec<Command>>>,
+    config: config::Config,
 ) {
     println!("Initialization complete, all hail camels o7");
     loop {
-        let interface_arc = interface_arc.clone();
+        let component_arc = component_arc.clone();
         match main_menu().await.as_str() {
-            "Interfaces" => {
-                let option = interface_menu().await;
-                match option.as_str() {
-                    "Add Interface" => {
-                        let interface = new_interface().await;
-                        let (local_tx, local_rx) = tokio::sync::mpsc::unbounded_channel();
-                        create_stdin_interface(&interface, tx.clone(), local_rx);
-                        interface_arc.lock().await.insert(interface.name, local_tx);
+            "Add Component" => {
+                let constructor = new_component().await;
+                create_interface(
+                    &constructor,
+                    component_arc.clone(),
+                    command_arc.clone(),
+                    config.clone(),
+                )
+                .await;
+            }
+            "Remove Component" => {
+                let target = choose_component(component_arc.clone()).await;
+                // Send kill to component
+                let mut lock = component_arc.lock().await;
+                match lock.get_mut(&target).unwrap().sender.send(Packet {
+                    source: "core".to_string(),
+                    destination: "".to_string(),
+                    event: "".to_string(),
+                    data: "kill".to_string(),
+                    sniffers: vec![],
+                }) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("Failed to send kill to {}", target);
+                        println!("{}", e);
                     }
-                    "Remove Interface" => {
-                        let interface = choose_option(interface_arc.clone()).await;
-                        interface_arc
-                            .lock()
-                            .await
-                            .get(&interface)
-                            .unwrap()
-                            .send(String::from("kill"))
-                            .unwrap();
-                        interface_arc.lock().await.remove(&interface);
-                    }
-                    "Reload Interface" => {
-                        let interface = choose_option(interface_arc.clone()).await;
-                        interface_arc
-                            .lock()
-                            .await
-                            .get(&interface)
-                            .unwrap()
-                            .send(String::from("reload"))
-                            .unwrap();
-                    }
-                    "List Interfaces" => {
-                        println!("{}", Style::new().underline().bold().paint("\nInterfaces"));
-                        list(interface_arc.clone()).await;
-                        println!("\n");
-                    }
-                    _ => {}
                 }
             }
-            "Plugins" => {
-                let option = plugin_menu().await;
-                match option.as_str() {
-                    "Add Plugin" => {
-                        let plugin = new_plugin().await;
-                        let (local_tx, local_rx) = tokio::sync::mpsc::unbounded_channel();
-                        create_stdin_plugin(&plugin, tx.clone(), local_rx);
-                        plugin_arc.lock().await.insert(plugin.name, local_tx);
+            "Reload Component" => {
+                let target = choose_component(component_arc.clone()).await;
+                // Send kill to component
+                let mut lock = component_arc.lock().await;
+                match lock.get_mut(&target).unwrap().sender.send(Packet {
+                    source: "core".to_string(),
+                    destination: "".to_string(),
+                    event: "".to_string(),
+                    data: "reload".to_string(),
+                    sniffers: vec![],
+                }) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("Failed to send kill to {}", target);
+                        println!("{}", e);
                     }
-                    "Remove Plugin" => {
-                        let plugin = choose_option(plugin_arc.clone()).await;
-                        plugin_arc.lock().await.remove(&plugin);
-                    }
-                    "Reload Plugin" => {
-                        let plugin = choose_option(plugin_arc.clone()).await;
-                        plugin_arc
-                            .lock()
-                            .await
-                            .get(&plugin)
-                            .unwrap()
-                            .send(String::from("reload"))
-                            .unwrap();
-                    }
-                    "List Plugins" => {
-                        println!("{}", Style::new().underline().bold().paint("\nPlugins"));
-                        list(plugin_arc.clone()).await;
-                        println!("\n");
-                    }
-                    _ => {}
                 }
             }
             "Exit" => {
-                kill_switch.send(()).unwrap(); // o7
+                let lock = component_arc.lock().await;
+                for (_, k) in lock.iter() {
+                    match k.sender.send(Packet {
+                        source: "core".to_string(),
+                        destination: "".to_string(),
+                        event: "".to_string(),
+                        data: "kill".to_string(),
+                        sniffers: vec![],
+                    }) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            println!("Error sending kill packet to component");
+                        }
+                    }
+                }
                 break;
             }
             _ => {} // This will never happen
@@ -98,26 +86,11 @@ pub async fn ui(
 
 async fn main_menu() -> String {
     tokio::task::spawn_blocking(move || {
-        let options = vec!["Interfaces", "Plugins", "Exit"];
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select an option")
-            .items(&options)
-            .interact()
-            .unwrap();
-        options[selection].to_string()
-    })
-    .await
-    .unwrap()
-}
-
-async fn interface_menu() -> String {
-    tokio::task::spawn_blocking(move || {
         let options = vec![
-            "Add Interface",
-            "Remove Interface",
-            "Reload Interface",
-            "List Interfaces",
-            "Back",
+            "Add Component",
+            "Remove Component",
+            "Reload Component",
+            "Exit",
         ];
         let selection = Select::with_theme(&ColorfulTheme::default())
             .with_prompt("Select an option")
@@ -130,69 +103,27 @@ async fn interface_menu() -> String {
     .unwrap()
 }
 
-async fn plugin_menu() -> String {
+async fn new_component() -> config::ComponentConstructor {
     tokio::task::spawn_blocking(move || {
-        let options = vec![
-            "Add Plugin",
-            "Remove Plugin",
-            "Reload Plugin",
-            "List Plugins",
-            "Back",
-        ];
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select an option")
-            .items(&options)
+        let type_options = vec!["Interface", "Plugin", "Sniffer"];
+        let type_ = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Choose what type of component")
+            .items(&type_options)
             .interact()
             .unwrap();
-        options[selection].to_string()
-    })
-    .await
-    .unwrap()
-}
-
-async fn list(arc: Arc<Mutex<HashMap<String, UnboundedSender<String>>>>) {
-    let map = arc.lock().await;
-    let mut keys: Vec<String> = map.keys().map(|x| x.to_string()).collect();
-    keys.sort();
-    for key in keys {
-        println!("• {}", key);
-    }
-}
-
-async fn new_interface() -> config::InterfaceConstructor {
-    tokio::task::spawn_blocking(move || {
-        let interface_name = dialoguer::Input::<String>::new()
-            .with_prompt("Interface name")
-            .interact()
-            .unwrap();
-        let command = dialoguer::Input::<String>::new()
-            .with_prompt("Command to launch interface")
-            .interact()
-            .unwrap();
-        config::InterfaceConstructor {
-            name: interface_name,
-            command: command,
-            network: false,
-            key: "".to_string(),
-        }
-    })
-    .await
-    .unwrap()
-}
-
-async fn new_plugin() -> config::PluginConstructor {
-    tokio::task::spawn_blocking(move || {
         let plugin_name = dialoguer::Input::<String>::new()
-            .with_prompt("Plugin name")
+            .with_prompt("Component name")
             .interact()
             .unwrap();
         let command = dialoguer::Input::<String>::new()
-            .with_prompt("Command to launch plugin")
+            .with_prompt("Command to launch component")
             .interact()
             .unwrap();
-        config::PluginConstructor {
+
+        config::ComponentConstructor {
             name: plugin_name,
             command: command,
+            type_: type_.try_into().unwrap(),
             network: false,
             key: "".to_string(),
         }
@@ -201,18 +132,17 @@ async fn new_plugin() -> config::PluginConstructor {
     .unwrap()
 }
 
-async fn choose_option(arc: Arc<Mutex<HashMap<String, UnboundedSender<String>>>>) -> String {
-    let map = arc.lock().await;
-    let mut keys: Vec<String> = map.keys().map(|x| x.to_string()).collect();
-    keys.sort();
-    tokio::task::spawn_blocking(move || {
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select your target")
-            .items(&keys)
-            .interact()
-            .unwrap();
-        keys[selection].to_string()
-    })
-    .await
-    .unwrap()
+async fn choose_component(components: Arc<Mutex<HashMap<String, Component>>>) -> String {
+    let options = components
+        .lock()
+        .await
+        .keys()
+        .cloned()
+        .collect::<Vec<String>>();
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select a component")
+        .items(&options)
+        .interact()
+        .unwrap();
+    options[selection].to_string()
 }
