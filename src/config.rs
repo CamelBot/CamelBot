@@ -11,23 +11,15 @@ pub struct Config {
     pub tcp: bool,
     pub port: u16,
     pub host: String,
-    pub plugins: Vec<PluginConstructor>,
-    pub interfaces: Vec<InterfaceConstructor>,
+    pub components: Vec<ComponentConstructor>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct PluginConstructor {
+pub struct ComponentConstructor {
     pub network: bool,
     pub command: String,
     pub name: String,
-    pub key: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct InterfaceConstructor {
-    pub network: bool,
-    pub command: String,
-    pub name: String,
+    pub type_: u8,
     pub key: String,
 }
 
@@ -37,8 +29,7 @@ impl Config {
             tcp: false,
             port: 0,
             host: "".to_string(),
-            plugins: Vec::new(),
-            interfaces: Vec::new(),
+            components: Vec::new(),
         }
     }
     pub async fn save(&self) {
@@ -65,29 +56,18 @@ impl Clone for Config {
             tcp: self.tcp,
             port: self.port,
             host: self.host.clone(),
-            plugins: self.plugins.clone(),
-            interfaces: self.interfaces.clone(),
+            components: self.components.clone(),
         }
     }
 }
 
-impl Clone for PluginConstructor {
-    fn clone(&self) -> PluginConstructor {
-        PluginConstructor {
+impl Clone for ComponentConstructor {
+    fn clone(&self) -> ComponentConstructor {
+        ComponentConstructor {
             network: self.network,
             command: self.command.clone(),
             name: self.name.clone(),
-            key: self.key.clone(),
-        }
-    }
-}
-
-impl Clone for InterfaceConstructor {
-    fn clone(&self) -> InterfaceConstructor {
-        InterfaceConstructor {
-            network: self.network,
-            command: self.command.clone(),
-            name: self.name.clone(),
+            type_: self.type_,
             key: self.key.clone(),
         }
     }

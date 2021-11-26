@@ -12,7 +12,7 @@ mod component;
 mod config;
 mod constants;
 mod packet;
-mod ui;
+//mod ui;
 
 #[tokio::main]
 async fn main() {
@@ -41,7 +41,7 @@ async fn main() {
     };
 
     // Start componenents
-    for i in config.interfaces.iter() {
+    for i in config.components.iter() {
         if i.network && !config.tcp {
             println!("Interface {} is configured for network mode, but TCP mode is not enabled. It will not be loaded.", i.name);
             continue;
@@ -55,6 +55,9 @@ async fn main() {
         component_arc.lock().await.insert(i.name.clone(), comp);
         // Notify each component of an update
         for j in component_arc.lock().await.values() {
+            if j.id == i.name {
+                continue;
+            }
             match j.sender.send(Packet {
                 source: "".to_string(),
                 destination: "".to_string(),

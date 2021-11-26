@@ -15,9 +15,9 @@ _ = [
     {
         type: "event",
         event: "message",
+        // Anything can be put in an event packet, as long as the receiving component is aware of extra data
         author: "jkcoxson",
         message: "Hello, world!",
-        // Anything can be put in an event packet, as long as the receiving component is aware of extra data
     },
 
     // Send packets

@@ -146,6 +146,7 @@ impl Component {
         loop {
             tokio::select! {
                 msg = reader.read() => {
+                    let msg = msg.replace("type_", "type"); // TODO figure out a better way to do this
                     // Attempt to parse msg as JSON
                     let msg = match serde_json::from_str::<serde_json::Value>(&msg) {
                         Ok(msg) => msg,
@@ -185,14 +186,62 @@ impl Component {
                             } else {
                                 // Broadcast the event to all components that want it
                                 for (_, k) in component_cache.iter_mut() {
-                                    if k.intents.contains(&msg["event"].to_string()) {
+                                    if k.id == id {
+                                        continue;
+                                    }
+                                    if k.intents.contains(&msg["event"].as_str().unwrap().to_string()) {
                                         match k.sender.send(to_send.clone()) {
-                                            _ => {} // Don't care
+                                            Ok(_) => {},
+                                            Err(e) => {
+                                                println!("Failed to send event {} to {}: {}", msg["event"], k.id, e);
+                                            }
                                         }
                                     }
                                 }
                             }
                         },
+                        "send" => {
+                            // Get the destination
+                            let destination = match msg["target"].as_str() {
+                                Some(destination) => destination,
+                                _ => {
+                                    continue;
+                                }
+                            };
+
+                            println!("got here 2");
+                            // Get the sniffers
+                            let mut sniffers = vec![];
+                            for (v, k) in component_cache.iter_mut() {
+                                if k.component_type == 2 {
+                                    sniffers.push(v.clone());
+                                }
+                            }
+                            let to_send = crate::packet::Packet {
+                                source: id.clone(),
+                                destination: destination.to_string(),
+                                event: "".to_string(),
+                                data: msg.to_string(),
+                                sniffers: sniffers.clone(),
+                            };
+
+                            if sniffers.len() > 0 {
+                                // Send packet to the first sniffer
+                                let sniffer = sniffers.remove(0);
+                                match component_cache.get_mut(&sniffer).unwrap().sender.send(to_send) {
+                                    _ => {} // Don't care
+                                }
+                            } else {
+                                // Send the packet to the destination
+                                match component_cache.get_mut(destination).unwrap().sender.send(to_send) {
+                                    Ok(_) => {},
+                                    Err(e) => {
+                                        println!("Failed to send packet to {}: {}", destination, e);
+                                    }
+                                }
+                            }
+                        },
+
                         "sniffer" => {
                             // Reconstruct the packet
                             // Determine if there are any more sniffers to send to
@@ -264,6 +313,7 @@ impl Component {
                             continue;
                         }
                     };
+                    println!("{} received packet {}", id, packet.data);
                     match packet.data.as_str() {
                         "kill" => {
                             return(false, receiver);
@@ -366,6 +416,7 @@ impl ComponentWrite for WriteHalf<'_> {
 impl ComponentWrite for ChildStdin {
     async fn write(&mut self, msg: String) {
         let msg = msg.replace("type_", "type");
+        let msg = format!("{}\n", msg);
         self.write_all(msg.as_bytes()).await.unwrap();
         self.flush().await.unwrap();
     }
