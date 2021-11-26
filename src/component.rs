@@ -151,6 +151,7 @@ impl Component {
     ) -> (bool, UnboundedReceiver<Packet>) // Should the component be automatically restarted on exit
     {
         println!("{} has started", id);
+        let mut id = id;
         let mut reader = reader;
         let mut writer = writer;
         let mut receiver = receiver;
@@ -314,6 +315,39 @@ impl Component {
                             }
                             // Save the command cache
                             commands::save_cache(commands.lock().await.to_vec()).await;
+                        }
+                        "id" => {
+                            // Get the id
+                            let changed_id = match msg["id"].as_str() {
+                                Some(id) => id,
+                                _ => {
+                                    continue;
+                                }
+                            };
+
+
+                            // Get self from the cache
+                            let component = component_cache.get_mut(&id).unwrap().clone();
+                            // Remove self from the cache
+                            let mut lock = components.lock().await;
+                            lock.remove(&id);
+                            // Add self to the cache
+                            lock.insert(changed_id.to_string(), component);
+                            id = changed_id.to_string();
+
+                            // Notify all components of the change
+                            for (_, v) in component_cache.iter_mut() {
+                                match v.sender.send(Packet {
+                                    source: id.clone(),
+                                    destination: "".to_string(),
+                                    event: "".to_string(),
+                                    data: "update".to_string(),
+                                    sniffers: vec![],
+                                }) {
+                                    _ => {} // Don't care
+                                }
+                            }
+
                         }
                         _ => {
                             continue;

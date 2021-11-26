@@ -59,6 +59,14 @@ _ = [
         data: "anything can go here, the plugin must know what to expect"
     },
 
+    // ID packets
+    // These packets are sent from the core to a plugin to change the ID of the plugin
+    // This is recommended to be done so that the plugin can be identified by other plugins
+    {
+        type: "id",
+        id: "my_fancy_plugin",
+    },
+
     // Sniffer packets
     // These packets are sent if the component is a sniffer
     // This packet must be returned to the core for it to be passed on to the destination component
