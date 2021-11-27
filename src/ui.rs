@@ -260,8 +260,12 @@ fn display_menu(
                 config.clone(),
             )
         })
-        .button("Remove Component", |s| {})
-        .button("Reload Component", |_| {})
+        .button("Remove Component", move |s| {
+            choose_component_removal(s, remove_arc.clone())
+        })
+        .button("Reload Component", move |s| {
+            choose_component_reload(s, reload_arc.clone())
+        })
         .button("Exit", |s| s.quit())
         .fixed_size((x_size, y_size)),
     );
@@ -497,17 +501,33 @@ fn collect_component_options(
 }
 
 // Component removal functions
-async fn choose_component_removal(
+fn choose_component_removal(
     siv: &mut Cursive,
-    list: Vec<String>,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
 ) {
-    siv.pop_layer();
+    let cloned_component_arc = component_arc.clone();
     let mut select = SelectView::new()
         .h_align(HAlign::Center)
         .autojump()
-        .on_submit(|s, choice: &str| {});
-    select.add_all_str(list);
+        .on_submit(move |s, choice: &str| {
+            let cloned_component_arc = cloned_component_arc.clone();
+            let choice = choice.to_string();
+            tokio::spawn(async move {
+                // Send kill the component
+                let mut lock = cloned_component_arc.lock().await;
+                match lock.get_mut(choice.as_str()).unwrap().sender.send(Packet {
+                    source: "core".to_string(),
+                    destination: "".to_string(),
+                    event: "".to_string(),
+                    data: "kill".to_string(),
+                    sniffers: vec![],
+                }) {
+                    _ => {}
+                }
+            });
+            s.pop_layer();
+        });
+    select.add_all_str(get_component_list(component_arc));
 
     let select = OnEventView::new(select)
         .on_pre_event_inner('k', |s, _| {
@@ -521,8 +541,69 @@ async fn choose_component_removal(
 
     siv.add_layer(
         Dialog::around(select.scrollable().fixed_size((20, 10)))
-            .title("Which component would you like to remove?"),
+            .title("Which component would you like to remove?\n"),
     );
+}
+
+// Component reload functions
+fn choose_component_reload(
+    siv: &mut Cursive,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+) {
+    let cloned_component_arc = component_arc.clone();
+    let mut select = SelectView::new()
+        .h_align(HAlign::Center)
+        .autojump()
+        .on_submit(move |s, choice: &str| {
+            let cloned_component_arc = cloned_component_arc.clone();
+            let choice = choice.to_string();
+            tokio::spawn(async move {
+                // Send kill the component
+                let mut lock = cloned_component_arc.lock().await;
+                match lock.get_mut(choice.as_str()).unwrap().sender.send(Packet {
+                    source: "core".to_string(),
+                    destination: "".to_string(),
+                    event: "".to_string(),
+                    data: "reload".to_string(),
+                    sniffers: vec![],
+                }) {
+                    _ => {}
+                }
+            });
+            s.pop_layer();
+        });
+    select.add_all_str(get_component_list(component_arc));
+
+    let select = OnEventView::new(select)
+        .on_pre_event_inner('k', |s, _| {
+            let cb = s.select_up(1);
+            Some(EventResult::Consumed(Some(cb)))
+        })
+        .on_pre_event_inner('j', |s, _| {
+            let cb = s.select_down(1);
+            Some(EventResult::Consumed(Some(cb)))
+        });
+
+    siv.add_layer(
+        Dialog::around(select.scrollable().fixed_size((20, 10)))
+            .title("Which component would you like to reload?\n"),
+    );
+}
+
+/// Wraps Tokio's mutex in a blocking function
+/// I don't know if this is really stupid or not
+/// Someone pls tell me if it's really stupid
+fn get_component_list(component_arc: Arc<Mutex<HashMap<String, Component>>>) -> Vec<String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    tokio::spawn(async move {
+        let mut list = Vec::new();
+        let component_arc = component_arc.lock().await;
+        for (name, _) in component_arc.iter() {
+            list.push(name.clone());
+        }
+        tx.send(list).unwrap();
+    });
+    rx.recv().unwrap()
 }
 
 fn get_term_size() -> (u16, u16) {
