@@ -1,17 +1,19 @@
 // jkcoxson
 
+use cursive::align::HAlign;
+use cursive::event::EventResult;
 use cursive::theme::{self};
-use cursive::traits::Boxable;
+use cursive::traits::{Boxable, Nameable, Scrollable};
 use cursive::{CursiveExt, With};
-use dialoguer::{theme::ColorfulTheme, Select};
-use std::{collections::HashMap, convert::TryInto, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
-use cursive::views::{Dialog, TextView};
+use cursive::views::{Dialog, EditView, OnEventView, SelectView, TextView};
 use cursive::Cursive;
 
+use crate::config::ComponentConstructor;
 use crate::constants;
-use crate::{commands::Command, component::Component, config, create_interface, packet::Packet};
+use crate::{commands::Command, component::Component, config, create_component, packet::Packet};
 
 pub struct UI {
     pub messages: Vec<String>,
@@ -65,176 +67,84 @@ impl Logger {
     }
 }
 
-pub async fn ui(
+//pub async fn ui(component_arc: Arc<Mutex<HashMap<String, Component>>>) {
+//println!("Initialization complete, all hail camels o7");
+//loop {
+//let component_arc = component_arc.clone();
+//match main_menu().await.as_str() {
+//"Remove Component" => {
+// let target = choose_component(component_arc.clone()).await;
+// let target = match target {
+//     Some(target) => target,
+//     None => continue,
+// };
+// // Send kill to component
+// let mut lock = component_arc.lock().await;
+// match lock.get_mut(&target).unwrap().sender.send(Packet {
+//     source: "core".to_string(),
+//     destination: "".to_string(),
+//     event: "".to_string(),
+//     data: "kill".to_string(),
+//     sniffers: vec![],
+// }) {
+//     Ok(_) => {}
+//     Err(e) => {
+//         println!("Failed to send kill to {}", target);
+//         println!("{}", e);
+//     }
+// }
+//}
+//"Reload Component" => {
+// let target = choose_component(component_arc.clone()).await;
+// let target = match target {
+//     Some(target) => target,
+//     None => continue,
+// };
+// // Send kill to component
+// let mut lock = component_arc.lock().await;
+// match lock.get_mut(&target).unwrap().sender.send(Packet {
+//     source: "core".to_string(),
+//     destination: "".to_string(),
+//     event: "".to_string(),
+//     data: "reload".to_string(),
+//     sniffers: vec![],
+// }) {
+//     Ok(_) => {}
+//     Err(e) => {
+//         println!("Failed to send kill to {}", target);
+//         println!("{}", e);
+//     }
+// }
+//}
+// "Exit" => {
+//     let lock = component_arc.lock().await;
+//     for (_, k) in lock.iter() {
+//         match k.sender.send(Packet {
+//             source: "core".to_string(),
+//             destination: "".to_string(),
+//             event: "".to_string(),
+//             data: "kill".to_string(),
+//             sniffers: vec![],
+//         }) {
+//             Ok(_) => {}
+//             Err(_) => {
+//                 println!("Error sending kill packet to component");
+//             }
+//         }
+//     }
+//     break;
+// }
+// _ => {} // This will never happen
+//}
+//}
+//}
+
+pub fn tui(
+    logger: Arc<std::sync::Mutex<UI>>,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
     config: config::Config,
 ) {
-    println!("Initialization complete, all hail camels o7");
-    loop {
-        let component_arc = component_arc.clone();
-        match main_menu().await.as_str() {
-            "Add Component" => {
-                let constructor = new_component().await;
-                let constructor = match constructor {
-                    Some(constructor) => constructor,
-                    None => {
-                        println!("Canceled");
-                        continue;
-                    }
-                };
-                // create_interface(
-                //     &constructor,
-                //     component_arc.clone(),
-                //     command_arc.clone(),
-                //     config.clone(),
-                // )
-                // .await;
-            }
-            "Remove Component" => {
-                let target = choose_component(component_arc.clone()).await;
-                let target = match target {
-                    Some(target) => target,
-                    None => continue,
-                };
-                // Send kill to component
-                let mut lock = component_arc.lock().await;
-                match lock.get_mut(&target).unwrap().sender.send(Packet {
-                    source: "core".to_string(),
-                    destination: "".to_string(),
-                    event: "".to_string(),
-                    data: "kill".to_string(),
-                    sniffers: vec![],
-                }) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("Failed to send kill to {}", target);
-                        println!("{}", e);
-                    }
-                }
-            }
-            "Reload Component" => {
-                let target = choose_component(component_arc.clone()).await;
-                let target = match target {
-                    Some(target) => target,
-                    None => continue,
-                };
-                // Send kill to component
-                let mut lock = component_arc.lock().await;
-                match lock.get_mut(&target).unwrap().sender.send(Packet {
-                    source: "core".to_string(),
-                    destination: "".to_string(),
-                    event: "".to_string(),
-                    data: "reload".to_string(),
-                    sniffers: vec![],
-                }) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("Failed to send kill to {}", target);
-                        println!("{}", e);
-                    }
-                }
-            }
-            "Exit" => {
-                let lock = component_arc.lock().await;
-                for (_, k) in lock.iter() {
-                    match k.sender.send(Packet {
-                        source: "core".to_string(),
-                        destination: "".to_string(),
-                        event: "".to_string(),
-                        data: "kill".to_string(),
-                        sniffers: vec![],
-                    }) {
-                        Ok(_) => {}
-                        Err(_) => {
-                            println!("Error sending kill packet to component");
-                        }
-                    }
-                }
-                break;
-            }
-            _ => {} // This will never happen
-        }
-    }
-}
-
-async fn main_menu() -> String {
-    tokio::task::spawn_blocking(move || {
-        let options = vec![
-            "Add Component",
-            "Remove Component",
-            "Reload Component",
-            "Exit",
-        ];
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select an option")
-            .items(&options)
-            .interact()
-            .unwrap();
-        options[selection].to_string()
-    })
-    .await
-    .unwrap()
-}
-
-async fn new_component() -> Option<config::ComponentConstructor> {
-    tokio::task::spawn_blocking(move || {
-        let type_options = vec!["Interface", "Plugin", "Sniffer", "Cancel"];
-        let type_ = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Choose what type of component")
-            .items(&type_options)
-            .default(3)
-            .interact()
-            .unwrap();
-        if type_ == 3 {
-            return None;
-        }
-        let plugin_name = dialoguer::Input::<String>::new()
-            .with_prompt("Component name")
-            .interact()
-            .unwrap();
-        if plugin_name.len() < 2 {
-            return None;
-        }
-        let command = dialoguer::Input::<String>::new()
-            .with_prompt("Command to launch component")
-            .interact()
-            .unwrap();
-        if command.len() < 2 {
-            return None;
-        }
-        Some(config::ComponentConstructor {
-            name: plugin_name,
-            command: command,
-            type_: type_.try_into().unwrap(),
-            network: false,
-            key: "".to_string(),
-        })
-    })
-    .await
-    .unwrap()
-}
-
-async fn choose_component(components: Arc<Mutex<HashMap<String, Component>>>) -> Option<String> {
-    let options = components
-        .lock()
-        .await
-        .keys()
-        .cloned()
-        .collect::<Vec<String>>();
-    if options.len() == 0 {
-        println!("No components to choose from");
-        return None;
-    }
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Select a component")
-        .items(&options)
-        .interact()
-        .unwrap();
-    Some(options[selection].to_string())
-}
-
-pub async fn tui(logger: Arc<std::sync::Mutex<UI>>) {
     // Create the cursive TUI
     let mut siv = Cursive::default();
 
@@ -252,9 +162,14 @@ pub async fn tui(logger: Arc<std::sync::Mutex<UI>>) {
     siv.set_fps(1);
 
     // Set log data
-    siv.set_user_data(logger);
+    siv.set_user_data(logger.clone());
 
-    siv.add_global_callback(cursive::event::Key::Esc, |s| {
+    let data_pack = (logger.clone(), component_arc, command_arc, config);
+    let esc_data_pack = data_pack.clone();
+    let refresh_data_pack = data_pack.clone();
+    let og_data_pack = data_pack.clone();
+
+    siv.add_global_callback(cursive::event::Key::Esc, move |s| {
         let lock = s.user_data::<Arc<std::sync::Mutex<UI>>>().unwrap().clone();
         let mut log = lock.lock().unwrap();
         if log.mode == 0 {
@@ -262,7 +177,16 @@ pub async fn tui(logger: Arc<std::sync::Mutex<UI>>) {
             display_log(s, log.messages.clone());
         } else {
             log.mode = 0;
-            display_menu(s);
+            display_menu(
+                s,
+                Logger {
+                    arc_reactor: esc_data_pack.0.clone(),
+                    id: "core".to_string(),
+                },
+                esc_data_pack.1.clone(),
+                esc_data_pack.2.clone(),
+                esc_data_pack.3.clone(),
+            );
         }
     });
     siv.add_global_callback(cursive::event::Event::Refresh, |s| {
@@ -272,24 +196,50 @@ pub async fn tui(logger: Arc<std::sync::Mutex<UI>>) {
             display_log(s, log.messages.clone());
         }
     });
-    siv.add_global_callback(cursive::event::Event::WindowResize, |s| {
+    siv.add_global_callback(cursive::event::Event::WindowResize, move |s| {
         let lock = s.user_data::<Arc<std::sync::Mutex<UI>>>().unwrap().clone();
         let log = lock.lock().unwrap();
         if log.mode == 1 {
             display_log(s, log.messages.clone());
         } else {
-            display_menu(s);
+            display_menu(
+                s,
+                Logger {
+                    arc_reactor: refresh_data_pack.0.clone(),
+                    id: "core".to_string(),
+                },
+                refresh_data_pack.1.clone(),
+                refresh_data_pack.2.clone(),
+                refresh_data_pack.3.clone(),
+            );
         }
     });
 
-    display_menu(&mut siv);
-
+    display_menu(
+        &mut siv,
+        Logger {
+            arc_reactor: og_data_pack.0.clone(),
+            id: "core".to_string(),
+        },
+        og_data_pack.1.clone(),
+        og_data_pack.2.clone(),
+        og_data_pack.3.clone(),
+    );
     siv.run();
 }
 
-fn display_menu(siv: &mut Cursive) {
+fn display_menu(
+    siv: &mut Cursive,
+    logger: crate::ui::Logger,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+    command_arc: Arc<Mutex<Vec<Command>>>,
+    config: config::Config,
+) {
     siv.pop_layer();
     let (x_size, y_size) = get_term_size();
+
+    let remove_arc = component_arc.clone();
+    let reload_arc = component_arc.clone();
 
     siv.add_layer(
         Dialog::around(Dialog::text(format!(
@@ -301,8 +251,16 @@ fn display_menu(siv: &mut Cursive) {
             }
         )))
         .title("CamelBot Menu")
-        .button("Load Component", |_| {})
-        .button("Remove Component", |_| {})
+        .button("Load Component", move |s| {
+            choose_component_type(
+                s,
+                logger.clone("core".to_string()),
+                component_arc.clone(),
+                command_arc.clone(),
+                config.clone(),
+            )
+        })
+        .button("Remove Component", |s| {})
         .button("Reload Component", |_| {})
         .button("Exit", |s| s.quit())
         .fixed_size((x_size, y_size)),
@@ -317,26 +275,253 @@ fn display_log(siv: &mut Cursive, messages: Vec<String>) {
     );
 }
 
-fn show_next(s: &mut Cursive) {
-    s.add_layer(
-        Dialog::text("Did you do the thing?")
-            .title("Question 1")
-            .button("Yes!", |s| show_answer(s, "I knew it! Well done!"))
-            .button("No!", |s| show_answer(s, "I knew you couldn't be trusted!"))
-            .button("Uh?", |s| s.add_layer(Dialog::info("Try again!")))
-            .fixed_size(get_term_size()),
+// Component loading functions
+fn choose_component_type(
+    siv: &mut Cursive,
+    logger: crate::ui::Logger,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+    command_arc: Arc<Mutex<Vec<Command>>>,
+    config: config::Config,
+) {
+    siv.pop_layer();
+    let pack1 = (
+        logger.clone("core".to_string()),
+        component_arc.clone(),
+        command_arc.clone(),
+        config.clone(),
+    );
+    let pack2 = (
+        logger.clone("core".to_string()),
+        component_arc.clone(),
+        command_arc.clone(),
+        config.clone(),
+    );
+    siv.add_layer(
+        Dialog::text("What type of component would you like?")
+            .title("Type")
+            .button("Interface", move |s| {
+                choose_name(
+                    s,
+                    0,
+                    pack1.0.clone("core".to_string()),
+                    pack1.1.clone(),
+                    pack1.2.clone(),
+                    pack1.3.clone(),
+                )
+            })
+            .button("Plugin", move |s| {
+                choose_name(
+                    s,
+                    1,
+                    pack2.0.clone("core".to_string()),
+                    pack2.1.clone(),
+                    pack2.2.clone(),
+                    pack2.3.clone(),
+                )
+            })
+            .button("Sniffer", move |s| {
+                choose_name(
+                    s,
+                    2,
+                    logger.clone("core".to_string()),
+                    component_arc.clone(),
+                    command_arc.clone(),
+                    config.clone(),
+                )
+            }),
     );
 }
 
-fn show_answer(s: &mut Cursive, msg: &str) {
-    s.pop_layer();
-    s.add_layer(
-        Dialog::text(msg)
-            .title("Results")
-            .button("Finish", |s| {
-                s.pop_layer();
-            })
-            .fixed_size(get_term_size()),
+fn choose_name(
+    siv: &mut Cursive,
+    type_: u8,
+    logger: crate::ui::Logger,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+    command_arc: Arc<Mutex<Vec<Command>>>,
+    config: config::Config,
+) {
+    let pack = (
+        logger.clone("core".to_string()),
+        component_arc.clone(),
+        command_arc.clone(),
+        config.clone(),
+    );
+    siv.pop_layer();
+    siv.add_layer(
+        Dialog::new()
+            .title("Enter your name")
+            // Padding is (left, right, top, bottom)
+            .padding_lrtb(1, 1, 1, 0)
+            .content(
+                EditView::new()
+                    // Call `show_popup` when the user presses `Enter`
+                    .on_submit(move |s, name| {
+                        choose_command(
+                            s,
+                            type_,
+                            name.to_string(),
+                            pack.0.clone("core".to_string()),
+                            pack.1.clone(),
+                            pack.2.clone(),
+                            pack.3.clone(),
+                        )
+                    })
+                    // Give the `EditView` a name so we can refer to it later.
+                    .with_name("name")
+                    // Wrap this in a `ResizedView` with a fixed width.
+                    // Do this _after_ `with_name` or the name will point to the
+                    // `ResizedView` instead of `EditView`!
+                    .fixed_width(20),
+            )
+            .button("Ok", move |s| {
+                // This will run the given closure, *ONLY* if a view with the
+                // correct type and the given name is found.
+                let name = s
+                    .call_on_name("name", |view: &mut EditView| {
+                        // We can return content from the closure!
+                        view.get_content()
+                    })
+                    .unwrap();
+
+                // Run the next step
+                choose_command(
+                    s,
+                    type_,
+                    name.to_string(),
+                    logger.clone("core".to_string()),
+                    component_arc.clone(),
+                    command_arc.clone(),
+                    config.clone(),
+                );
+            }),
+    );
+}
+
+fn choose_command(
+    siv: &mut Cursive,
+    type_: u8,
+    name: String,
+    logger: crate::ui::Logger,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+    command_arc: Arc<Mutex<Vec<Command>>>,
+    config: config::Config,
+) {
+    siv.pop_layer();
+    let pack = (
+        name.clone(),
+        logger.clone("core".to_string()),
+        component_arc.clone(),
+        command_arc.clone(),
+        config.clone(),
+    );
+    siv.add_layer(
+        Dialog::new()
+            .title("Enter the command to start the component")
+            // Padding is (left, right, top, bottom)
+            .padding_lrtb(1, 1, 1, 0)
+            .content(
+                EditView::new()
+                    // Call `show_popup` when the user presses `Enter`
+                    .on_submit(move |s, command| {
+                        collect_component_options(
+                            s,
+                            type_,
+                            pack.0.clone(),
+                            command.to_string(),
+                            pack.1.clone("core".to_string()),
+                            pack.2.clone(),
+                            pack.3.clone(),
+                            pack.4.clone(),
+                        )
+                    })
+                    // Give the `EditView` a name so we can refer to it later.
+                    .with_name("name")
+                    // Wrap this in a `ResizedView` with a fixed width.
+                    // Do this _after_ `with_name` or the name will point to the
+                    // `ResizedView` instead of `EditView`!
+                    .fixed_width(20),
+            )
+            .button("Ok", move |s| {
+                // This will run the given closure, *ONLY* if a view with the
+                // correct type and the given name is found.
+                let command = s
+                    .call_on_name("name", |view: &mut EditView| {
+                        // We can return content from the closure!
+                        view.get_content()
+                    })
+                    .unwrap();
+
+                // Run the next step
+                collect_component_options(
+                    s,
+                    type_,
+                    name.clone(),
+                    command.to_string(),
+                    logger.clone("core".to_string()),
+                    component_arc.clone(),
+                    command_arc.clone(),
+                    config.clone(),
+                );
+            }),
+    );
+}
+
+fn collect_component_options(
+    siv: &mut Cursive,
+    type_: u8,
+    name: String,
+    command: String,
+    logger: crate::ui::Logger,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+    command_arc: Arc<Mutex<Vec<Command>>>,
+    config: config::Config,
+) {
+    siv.pop_layer();
+    let constructor = ComponentConstructor {
+        network: false,
+        command,
+        name,
+        type_,
+        key: "".to_string(),
+    };
+    let pack = (
+        logger.clone("core".to_string()),
+        component_arc.clone(),
+        command_arc.clone(),
+        config.clone(),
+    );
+    tokio::spawn(
+        async move { create_component(&constructor, pack.0, pack.1, pack.2, pack.3).await },
+    );
+    display_menu(siv, logger, component_arc, command_arc, config);
+}
+
+// Component removal functions
+async fn choose_component_removal(
+    siv: &mut Cursive,
+    list: Vec<String>,
+    component_arc: Arc<Mutex<HashMap<String, Component>>>,
+) {
+    siv.pop_layer();
+    let mut select = SelectView::new()
+        .h_align(HAlign::Center)
+        .autojump()
+        .on_submit(|s, choice: &str| {});
+    select.add_all_str(list);
+
+    let select = OnEventView::new(select)
+        .on_pre_event_inner('k', |s, _| {
+            let cb = s.select_up(1);
+            Some(EventResult::Consumed(Some(cb)))
+        })
+        .on_pre_event_inner('j', |s, _| {
+            let cb = s.select_down(1);
+            Some(EventResult::Consumed(Some(cb)))
+        });
+
+    siv.add_layer(
+        Dialog::around(select.scrollable().fixed_size((20, 10)))
+            .title("Which component would you like to remove?"),
     );
 }
 

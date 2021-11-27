@@ -4,7 +4,7 @@
 
 use commands::Command;
 use config::ComponentConstructor;
-use std::{collections::HashMap, sync::Arc, thread};
+use std::{collections::HashMap, sync::Arc};
 use tokio::{fs::File, sync::Mutex};
 
 use crate::{component::Component, packet::Packet};
@@ -46,7 +46,7 @@ async fn main() {
 
     // Start componenents
     for i in config.components.iter() {
-        create_interface(
+        create_component(
             i,
             logger.clone("core".to_string()),
             component_arc.clone(),
@@ -67,10 +67,15 @@ async fn main() {
     // UI loop yeet
     // This is now blocking to stop the program from exiting
     //ui::ui(component_arc.clone(), command_arc.clone(), config).await;
-    ui::tui(arc_reactor).await;
+    ui::tui(
+        arc_reactor,
+        component_arc.clone(),
+        command_arc.clone(),
+        config,
+    );
 }
 
-pub async fn create_interface(
+pub async fn create_component(
     i: &ComponentConstructor,
     logger: ui::Logger,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
