@@ -7,10 +7,24 @@ use dialoguer::{theme::ColorfulTheme, Select};
 use std::{collections::HashMap, convert::TryInto, sync::Arc};
 use tokio::sync::Mutex;
 
-use cursive::views::Dialog;
+use cursive::views::{Dialog, TextView};
 use cursive::Cursive;
 
+use crate::constants;
 use crate::{commands::Command, component::Component, config, create_interface, packet::Packet};
+
+pub struct UI {
+    pub messages: Vec<String>,
+    pub mode: u8, // 0 = menu, 1 = log
+}
+impl UI {
+    pub fn new() -> Self {
+        UI {
+            messages: Vec::new(),
+            mode: 0,
+        }
+    }
+}
 
 pub async fn ui(
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
@@ -181,7 +195,7 @@ async fn choose_component(components: Arc<Mutex<HashMap<String, Component>>>) ->
     Some(options[selection].to_string())
 }
 
-pub async fn tui() {
+pub async fn tui(logger: Arc<std::sync::Mutex<UI>>) {
     // Create the cursive TUI
     let mut siv = Cursive::default();
 
@@ -196,23 +210,75 @@ pub async fn tui() {
             theme::Color::Dark(theme::BaseColor::Black);
     });
     siv.set_theme(theme);
+    siv.set_fps(1);
 
-    // Bind 'q' to quit I guess. TODO make this a confirmation dialog
-    siv.add_global_callback('q', |s| s.quit());
+    // Set log data
+    siv.set_user_data(logger);
 
-    siv.add_layer(
-        Dialog::text("This is a survey!\nPress <Next> when you're ready.")
-            .title("Important survey")
-            .button("Next", show_next)
-            .fixed_size(get_term_size()),
-    );
+    siv.add_global_callback(cursive::event::Key::Esc, |s| {
+        let lock = s.user_data::<Arc<std::sync::Mutex<UI>>>().unwrap().clone();
+        let mut log = lock.lock().unwrap();
+        if log.mode == 0 {
+            log.mode = 1;
+            display_log(s, log.messages.clone());
+        } else {
+            log.mode = 0;
+            display_menu(s);
+        }
+    });
+    siv.add_global_callback(cursive::event::Event::Refresh, |s| {
+        let lock = s.user_data::<Arc<std::sync::Mutex<UI>>>().unwrap().clone();
+        let log = lock.lock().unwrap();
+        if log.mode == 1 {
+            display_log(s, log.messages.clone());
+        }
+    });
+    siv.add_global_callback(cursive::event::Event::WindowResize, |s| {
+        let lock = s.user_data::<Arc<std::sync::Mutex<UI>>>().unwrap().clone();
+        let log = lock.lock().unwrap();
+        if log.mode == 1 {
+            display_log(s, log.messages.clone());
+        } else {
+            display_menu(s);
+        }
+    });
 
-    // Run I guess?
+    display_menu(&mut siv);
+
     siv.run();
 }
 
+fn display_menu(siv: &mut Cursive) {
+    siv.pop_layer();
+    let (x_size, y_size) = get_term_size();
+
+    siv.add_layer(
+        Dialog::around(Dialog::text(format!(
+            "Select an option\n{}",
+            if x_size > 109 {
+                constants::SPLASH_SCREEN
+            } else {
+                constants::SMOL_CAMEL
+            }
+        )))
+        .title("CamelBot Menu")
+        .button("Load Component", |_| {})
+        .button("Remove Component", |_| {})
+        .button("Reload Component", |_| {})
+        .button("Exit", |s| s.quit())
+        .fixed_size(get_term_size()),
+    );
+}
+fn display_log(siv: &mut Cursive, messages: Vec<String>) {
+    siv.pop_layer();
+    siv.add_layer(
+        Dialog::around(TextView::new(messages.join("\n")))
+            .title("Log")
+            .fixed_size(get_term_size()),
+    );
+}
+
 fn show_next(s: &mut Cursive) {
-    s.pop_layer();
     s.add_layer(
         Dialog::text("Did you do the thing?")
             .title("Question 1")
@@ -228,7 +294,9 @@ fn show_answer(s: &mut Cursive, msg: &str) {
     s.add_layer(
         Dialog::text(msg)
             .title("Results")
-            .button("Finish", |s| s.quit())
+            .button("Finish", |s| {
+                s.pop_layer();
+            })
             .fixed_size(get_term_size()),
     );
 }

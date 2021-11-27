@@ -4,7 +4,7 @@
 
 use commands::Command;
 use config::ComponentConstructor;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, thread};
 use tokio::{fs::File, sync::Mutex};
 
 use crate::{component::Component, packet::Packet};
@@ -42,6 +42,9 @@ async fn main() {
         Err(_) => Arc::new(Mutex::new(Vec::new())),
     };
 
+    // Logger
+    let logger = Arc::new(std::sync::Mutex::new(ui::UI::new()));
+
     // Start componenents
     for i in config.components.iter() {
         create_interface(
@@ -61,10 +64,20 @@ async fn main() {
         // If they match, give the component the client
     }
 
+    let cloned_logger = logger.clone();
+    thread::spawn(move || loop {
+        thread::sleep(std::time::Duration::from_secs(5));
+        cloned_logger
+            .lock()
+            .unwrap()
+            .messages
+            .push("Yeet".to_string());
+    });
+
     // UI loop yeet
     // This is now blocking to stop the program from exiting
     //ui::ui(component_arc.clone(), command_arc.clone(), config).await;
-    ui::tui().await;
+    ui::tui(logger).await;
 }
 
 pub async fn create_interface(

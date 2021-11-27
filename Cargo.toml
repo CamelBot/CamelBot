@@ -15,4 +15,5 @@ async-trait = { version = "*" }
 crossterm = { version = "*" }
 cursive = { version = "*" }
 cursive_core = { version = "*" }
+cursive-tabs = { version = "*" }
 termsize = { version = "*" }
