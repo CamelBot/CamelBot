@@ -1,16 +1,14 @@
 // jkcoxson
 
+use cursive::theme::{self};
+use cursive::traits::Boxable;
+use cursive::{CursiveExt, With};
 use dialoguer::{theme::ColorfulTheme, Select};
 use std::{collections::HashMap, convert::TryInto, sync::Arc};
 use tokio::sync::Mutex;
-use tui::text::Text;
 
-use std::io;
-use termion::raw::IntoRawMode;
-use tui::backend::TermionBackend;
-use tui::layout::{Constraint, Direction, Layout};
-use tui::widgets::{Block, Borders, Paragraph, Widget};
-use tui::Terminal;
+use cursive::views::Dialog;
+use cursive::Cursive;
 
 use crate::{commands::Command, component::Component, config, create_interface, packet::Packet};
 
@@ -184,21 +182,59 @@ async fn choose_component(components: Arc<Mutex<HashMap<String, Component>>>) ->
 }
 
 pub async fn tui() {
-    let stdout = io::stdout().into_raw_mode().unwrap();
-    let backend = TermionBackend::new(stdout);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                .split(f.size());
+    // Create the cursive TUI
+    let mut siv = Cursive::default();
 
-            let block = Block::default().title("Block").borders(Borders::ALL);
-            f.render_widget(block, chunks[0]);
-            let block = Block::default().title("Block 2").borders(Borders::ALL);
-            f.render_widget(block, chunks[1]);
-        })
-        .unwrap();
-    loop {}
+    // Chang color scheme to hacker theme
+    let theme = siv.current_theme().clone().with(|theme| {
+        theme.palette[theme::PaletteColor::View] = theme::Color::Dark(theme::BaseColor::Black);
+        theme.palette[theme::PaletteColor::Primary] = theme::Color::Light(theme::BaseColor::Green);
+        theme.palette[theme::PaletteColor::TitlePrimary] =
+            theme::Color::Light(theme::BaseColor::Green);
+        theme.palette[theme::PaletteColor::Highlight] = theme::Color::Dark(theme::BaseColor::Green);
+        theme.palette[theme::PaletteColor::Background] =
+            theme::Color::Dark(theme::BaseColor::Black);
+    });
+    siv.set_theme(theme);
+
+    // Bind 'q' to quit I guess. TODO make this a confirmation dialog
+    siv.add_global_callback('q', |s| s.quit());
+
+    siv.add_layer(
+        Dialog::text("This is a survey!\nPress <Next> when you're ready.")
+            .title("Important survey")
+            .button("Next", show_next)
+            .fixed_size(get_term_size()),
+    );
+
+    // Run I guess?
+    siv.run();
+}
+
+fn show_next(s: &mut Cursive) {
+    s.pop_layer();
+    s.add_layer(
+        Dialog::text("Did you do the thing?")
+            .title("Question 1")
+            .button("Yes!", |s| show_answer(s, "I knew it! Well done!"))
+            .button("No!", |s| show_answer(s, "I knew you couldn't be trusted!"))
+            .button("Uh?", |s| s.add_layer(Dialog::info("Try again!")))
+            .fixed_size(get_term_size()),
+    );
+}
+
+fn show_answer(s: &mut Cursive, msg: &str) {
+    s.pop_layer();
+    s.add_layer(
+        Dialog::text(msg)
+            .title("Results")
+            .button("Finish", |s| s.quit())
+            .fixed_size(get_term_size()),
+    );
+}
+
+fn get_term_size() -> (u16, u16) {
+    termsize::get()
+        .map(|size| return (size.cols - 2, size.rows - 2))
+        .unwrap_or((80, 24))
 }

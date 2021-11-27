@@ -13,4 +13,6 @@ dialoguer = { version = "*" }
 ansi_term = { version = "*" }
 async-trait = { version = "*" }
 crossterm = { version = "*" }
-tui = { version = "*" }
+cursive = { version = "*" }
+cursive_core = { version = "*" }
+termsize = { version = "*" }
