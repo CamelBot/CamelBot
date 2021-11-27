@@ -17,12 +17,51 @@ pub struct UI {
     pub messages: Vec<String>,
     pub mode: u8, // 0 = menu, 1 = log
 }
+
+pub struct Logger {
+    pub arc_reactor: Arc<std::sync::Mutex<UI>>,
+    pub id: String,
+}
+
 impl UI {
     pub fn new() -> Self {
         UI {
             messages: Vec::new(),
             mode: 0,
         }
+    }
+}
+
+impl Logger {
+    pub fn new(arc: Arc<std::sync::Mutex<UI>>) -> Self {
+        Logger {
+            arc_reactor: arc,
+            id: "core".to_string(),
+        }
+    }
+    pub fn clone(&self, id: String) -> Self {
+        Logger {
+            arc_reactor: self.arc_reactor.clone(),
+            id: id.to_string(),
+        }
+    }
+    pub fn debug(&self, message: &str) {
+        let mut ui = self.arc_reactor.lock().unwrap();
+        ui.messages
+            .push(format!("DEBUG: [{}] {}", self.id, message));
+    }
+    pub fn info(&self, message: &str) {
+        let mut ui = self.arc_reactor.lock().unwrap();
+        ui.messages.push(format!("INFO: [{}] {}", self.id, message));
+    }
+    pub fn warn(&self, message: &str) {
+        let mut ui = self.arc_reactor.lock().unwrap();
+        ui.messages.push(format!("WARN: [{}] {}", self.id, message));
+    }
+    pub fn error(&self, message: &str) {
+        let mut ui = self.arc_reactor.lock().unwrap();
+        ui.messages
+            .push(format!("ERROR: [{}] {}", self.id, message));
     }
 }
 
@@ -44,13 +83,13 @@ pub async fn ui(
                         continue;
                     }
                 };
-                create_interface(
-                    &constructor,
-                    component_arc.clone(),
-                    command_arc.clone(),
-                    config.clone(),
-                )
-                .await;
+                // create_interface(
+                //     &constructor,
+                //     component_arc.clone(),
+                //     command_arc.clone(),
+                //     config.clone(),
+                // )
+                // .await;
             }
             "Remove Component" => {
                 let target = choose_component(component_arc.clone()).await;
@@ -266,7 +305,7 @@ fn display_menu(siv: &mut Cursive) {
         .button("Remove Component", |_| {})
         .button("Reload Component", |_| {})
         .button("Exit", |s| s.quit())
-        .fixed_size(get_term_size()),
+        .fixed_size((x_size, y_size)),
     );
 }
 fn display_log(siv: &mut Cursive, messages: Vec<String>) {
