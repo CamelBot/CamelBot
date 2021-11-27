@@ -506,6 +506,13 @@ fn choose_component_removal(
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
 ) {
     let cloned_component_arc = component_arc.clone();
+
+    let list = get_component_list(component_arc);
+    if list.len() == 0 {
+        siv.add_layer(Dialog::info("No components to remove"));
+        return;
+    }
+
     let mut select = SelectView::new()
         .h_align(HAlign::Center)
         .autojump()
@@ -527,7 +534,7 @@ fn choose_component_removal(
             });
             s.pop_layer();
         });
-    select.add_all_str(get_component_list(component_arc));
+    select.add_all_str(list);
 
     let select = OnEventView::new(select)
         .on_pre_event_inner('k', |s, _| {
@@ -551,6 +558,13 @@ fn choose_component_reload(
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
 ) {
     let cloned_component_arc = component_arc.clone();
+
+    let list = get_component_list(component_arc);
+    if list.len() == 0 {
+        siv.add_layer(Dialog::info("No components to reload"));
+        return;
+    }
+
     let mut select = SelectView::new()
         .h_align(HAlign::Center)
         .autojump()
@@ -572,7 +586,7 @@ fn choose_component_reload(
             });
             s.pop_layer();
         });
-    select.add_all_str(get_component_list(component_arc));
+    select.add_all_str(list);
 
     let select = OnEventView::new(select)
         .on_pre_event_inner('k', |s, _| {
