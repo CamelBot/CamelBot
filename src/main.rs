@@ -18,13 +18,15 @@ mod ui;
 
 #[tokio::main]
 async fn main() {
-    println!("{}", constants::SPLASH_SCREEN);
+    // Set up the logger
+    let arc_reactor = Arc::new(std::sync::Mutex::new(ui::UI::new()));
+    let logger = ui::Logger::new(arc_reactor.clone());
 
     // Try to load the config file
     let config = match config::Config::load().await {
         Some(config) => config,
         None => {
-            println!("Config file not found, generating a new one.");
+            logger.warn("Config file not found, generating a new one.");
             let conf = config::Config::new();
             conf.save().await;
             conf
@@ -44,8 +46,9 @@ async fn main() {
 
     // Start componenents
     for i in config.components.iter() {
-        create_interface(
+        create_component(
             i,
+            logger.clone("core".to_string()),
             component_arc.clone(),
             command_arc.clone(),
             config.clone(),
@@ -63,17 +66,24 @@ async fn main() {
 
     // UI loop yeet
     // This is now blocking to stop the program from exiting
-    ui::ui(component_arc.clone(), command_arc.clone(), config).await;
+    //ui::ui(component_arc.clone(), command_arc.clone(), config).await;
+    ui::tui(
+        arc_reactor,
+        component_arc.clone(),
+        command_arc.clone(),
+        config,
+    );
 }
 
-pub async fn create_interface(
+pub async fn create_component(
     i: &ComponentConstructor,
+    logger: ui::Logger,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
     config: config::Config,
 ) {
     if i.network && !config.tcp {
-        println!("Interface {} is configured for network mode, but TCP mode is not enabled. It will not be loaded.", i.name);
+        logger.warn(format!("Interface {} is configured for network mode, but TCP mode is not enabled. It will not be loaded.", i.name).as_str());
         return;
     }
 
@@ -106,6 +116,7 @@ pub async fn create_interface(
 
     component::Component::connect(
         i.name.clone(),
+        logger.clone(i.name.clone()),
         command.to_string(),
         args,
         component_arc.clone(),

@@ -23,6 +23,7 @@ use tokio::{
 use crate::{
     commands::{self, Command},
     packet::Packet,
+    ui,
 };
 
 pub struct Component {
@@ -59,6 +60,7 @@ impl Component {
 
     pub async fn connect(
         id: String,
+        logger: ui::Logger,
         command: String,
         args: Vec<String>,
         components: Arc<Mutex<HashMap<String, Component>>>,
@@ -89,7 +91,9 @@ impl Component {
                         {
                             Ok(cmd) => cmd,
                             Err(e) => {
-                                println!("Failed to start component {}: {}", id, e);
+                                logger.error(
+                                    format!("Failed to start component {}: {}", id, e).as_str(),
+                                );
                                 return;
                             }
                         };
@@ -99,6 +103,7 @@ impl Component {
                         let stdout = BufReader::new(stdout);
                         let (rep, rec) = Component::run(
                             id.clone(),
+                            logger.clone(logger.id.clone()),
                             stdout,
                             stdin,
                             cloned_components.clone(),
@@ -143,6 +148,7 @@ impl Component {
     /// * `(bool, UnboundedReceiver<Packet>)` - Whether the component should continue running and the receiver to receive packets from other components
     pub async fn run(
         id: String,
+        logger: ui::Logger,
         reader: impl ComponentRead,
         writer: impl ComponentWrite,
         components: Arc<Mutex<HashMap<String, Component>>>,
@@ -150,7 +156,8 @@ impl Component {
         receiver: UnboundedReceiver<Packet>,
     ) -> (bool, UnboundedReceiver<Packet>) // Should the component be automatically restarted on exit
     {
-        println!("{} has started", id);
+        logger.info(format!("{} has started", id).as_str());
+        let mut id = id;
         let mut reader = reader;
         let mut writer = writer;
         let mut receiver = receiver;
@@ -209,13 +216,13 @@ impl Component {
                                         match k.sender.send(to_send.clone()) {
                                             Ok(_) => {},
                                             Err(e) => {
-                                                println!("Failed to send event {} to {}: {}", msg["event"], k.id, e);
+                                                logger.error(format!("Failed to send event {} to {}: {}", msg["event"], k.id, e).as_str());
                                             }
                                         }
                                     }
                                 }
                             }
-                        },
+                        }
                         "send" => {
                             // Get the destination
                             let destination = match msg["target"].as_str() {
@@ -251,12 +258,11 @@ impl Component {
                                 match component_cache.get_mut(destination).unwrap().sender.send(to_send) {
                                     Ok(_) => {},
                                     Err(e) => {
-                                        println!("Failed to send packet to {}: {}", destination, e);
+                                        logger.error(format!("Failed to send packet to {}: {}", destination, e).as_str());
                                     }
                                 }
                             }
-                        },
-
+                        }
                         "sniffer" => {
                             // Reconstruct the packet
                             // Determine if there are any more sniffers to send to
@@ -314,6 +320,49 @@ impl Component {
                             }
                             // Save the command cache
                             commands::save_cache(commands.lock().await.to_vec()).await;
+                        }
+                        "id" => {
+                            // Get the id
+                            let changed_id = match msg["id"].as_str() {
+                                Some(id) => id,
+                                _ => {
+                                    continue;
+                                }
+                            };
+
+
+                            // Get self from the cache
+                            let component = component_cache.get_mut(&id).unwrap().clone();
+                            // Remove self from the cache
+                            let mut lock = components.lock().await;
+                            lock.remove(&id);
+                            // Add self to the cache
+                            lock.insert(changed_id.to_string(), component);
+                            id = changed_id.to_string();
+
+                            // Notify all components of the change
+                            for (_, v) in component_cache.iter_mut() {
+                                match v.sender.send(Packet {
+                                    source: id.clone(),
+                                    destination: "".to_string(),
+                                    event: "".to_string(),
+                                    data: "update".to_string(),
+                                    sniffers: vec![],
+                                }) {
+                                    _ => {} // Don't care
+                                }
+                            }
+
+                        }
+                        "debug" => {
+                            // Get the debug message
+                            let debug_message = match msg["message"].as_str() {
+                                Some(message) => message,
+                                _ => {
+                                    continue;
+                                }
+                            };
+                            logger.debug(debug_message);
                         }
                         _ => {
                             continue;
