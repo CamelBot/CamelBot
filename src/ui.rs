@@ -85,6 +85,8 @@ pub fn tui(
         theme.palette[theme::PaletteColor::Highlight] = theme::Color::Dark(theme::BaseColor::Green);
         theme.palette[theme::PaletteColor::Background] =
             theme::Color::Dark(theme::BaseColor::Black);
+        theme.palette[theme::PaletteColor::Secondary] =
+            theme::Color::Light(theme::BaseColor::Green);
     });
     siv.set_theme(theme);
     siv.set_fps(1);
