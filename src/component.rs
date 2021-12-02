@@ -363,7 +363,37 @@ impl Component {
                                 }
                             };
                             logger.debug(debug_message);
-                        }
+                        },
+                        "error" => {
+                            // Get the error message
+                            let error_message = match msg["message"].as_str() {
+                                Some(message) => message,
+                                _ => {
+                                    continue;
+                                }
+                            };
+                            logger.error(error_message);
+                        },
+                        "warn" => {
+                            // Get the warn message
+                            let warn_message = match msg["message"].as_str() {
+                                Some(message) => message,
+                                _ => {
+                                    continue;
+                                }
+                            };
+                            logger.warn(warn_message);
+                        },
+                        "info" => {
+                            // Get the info message
+                            let info_message = match msg["message"].as_str() {
+                                Some(message) => message,
+                                _ => {
+                                    continue;
+                                }
+                            };
+                            logger.info(info_message);
+                        },
                         _ => {
                             continue;
                         }

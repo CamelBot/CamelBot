@@ -18,6 +18,7 @@ use crate::{commands::Command, component::Component, config, create_component, p
 pub struct UI {
     pub messages: Vec<String>,
     pub mode: u8, // 0 = menu, 1 = log
+    pub hacker_messages: Vec<String>,
 }
 
 pub struct Logger {
@@ -30,6 +31,7 @@ impl UI {
         UI {
             messages: Vec::new(),
             mode: 0,
+            hacker_messages: Vec::new(),
         }
     }
 }
@@ -89,7 +91,7 @@ pub fn tui(
             theme::Color::Light(theme::BaseColor::Green);
     });
     siv.set_theme(theme);
-    siv.set_fps(1);
+    siv.set_fps(2);
 
     // Set log data
     siv.set_user_data(logger.clone());
@@ -102,28 +104,41 @@ pub fn tui(
     siv.add_global_callback(cursive::event::Key::Esc, move |s| {
         let lock = s.user_data::<Arc<std::sync::Mutex<UI>>>().unwrap().clone();
         let mut log = lock.lock().unwrap();
-        if log.mode == 0 {
-            log.mode = 1;
-            display_log(s, log.messages.clone());
-        } else {
-            log.mode = 0;
-            display_menu(
-                s,
-                Logger {
-                    arc_reactor: esc_data_pack.0.clone(),
-                    id: "core".to_string(),
-                },
-                esc_data_pack.1.clone(),
-                esc_data_pack.2.clone(),
-                esc_data_pack.3.clone(),
-            );
+
+        match log.mode {
+            1 => {
+                log.mode = 0;
+                display_menu(
+                    s,
+                    Logger {
+                        arc_reactor: esc_data_pack.0.clone(),
+                        id: "core".to_string(),
+                    },
+                    esc_data_pack.1.clone(),
+                    esc_data_pack.2.clone(),
+                    esc_data_pack.3.clone(),
+                );
+            }
+            _ => {
+                log.mode = 1;
+                display_log(s, log.messages.clone());
+            }
         }
+    });
+    siv.add_global_callback(cursive::event::Key::Backspace, move |s| {
+        let lock = s.user_data::<Arc<std::sync::Mutex<UI>>>().unwrap().clone();
+        let mut log = lock.lock().unwrap();
+        log.mode = 2;
+        display_log(s, vec!["Hacking the mainframe...".to_string()]);
     });
     siv.add_global_callback(cursive::event::Event::Refresh, |s| {
         let lock = s.user_data::<Arc<std::sync::Mutex<UI>>>().unwrap().clone();
         let log = lock.lock().unwrap();
         if log.mode == 1 {
             display_log(s, log.messages.clone());
+        }
+        if log.mode == 2 {
+            display_log(s, log.hacker_messages.clone());
         }
     });
     siv.add_global_callback(cursive::event::Event::WindowResize, move |s| {
@@ -202,8 +217,18 @@ fn display_menu(
 }
 fn display_log(siv: &mut Cursive, messages: Vec<String>) {
     siv.pop_layer();
+    // Only get the last logs the terminal will fit
+    let mut to_print = Vec::new();
+    let screen_y = get_term_size().1 - 2;
+    for i in messages {
+        to_print.push(i);
+        if to_print.len() > screen_y.into() {
+            to_print.remove(0);
+        }
+    }
+
     siv.add_layer(
-        Dialog::around(TextView::new(messages.join("\n")))
+        Dialog::around(TextView::new(to_print.join("\n")))
             .title("Log")
             .fixed_size(get_term_size()),
     );
