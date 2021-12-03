@@ -171,12 +171,14 @@ impl Component {
                 msg = reader.read() => {
                     let msg = msg.replace("type_", "type"); // TODO figure out a better way to do this
                     // Attempt to parse msg as JSON
-                    let msg = match serde_json::from_str::<serde_json::Value>(&msg) {
+                    let mut msg = match serde_json::from_str::<serde_json::Value>(&msg) {
                         Ok(msg) => msg,
                         _ => {
                             continue;
                         }
                     };
+                    // Add source to msg
+                    msg.as_object_mut().unwrap().insert("source".to_string(), id.clone().into());
                     let packet_type = match msg["type"].as_str() {
                         Some(type_) => type_,
                         _ => {
