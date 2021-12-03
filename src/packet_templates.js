@@ -26,8 +26,10 @@ _ = [
     {
         type: "send",
         target: "my_fancy_component",
-        banana: "yellow",
-        apple: "red",
+        data: {
+            type: "send type",
+            // Any data that needs to be sent
+        }
     },
 
     // Intents packets
@@ -55,7 +57,6 @@ _ = [
     {
         type: "command",
         name: "fancycommand",
-        source: "fancy interface", // The name of the interface that sent the command
         // Any fields after this are up to the interface to define
         data: "anything can go here, the plugin must know what to expect"
     },
@@ -74,7 +75,6 @@ _ = [
     // If it is not returned, the packet will be dropped
     {
         type: "sniffer",
-        source: "interface_1",
         destination: "interface_2",
         event: "",
         sniffers: [], // No touchy, the core manages this. It is kept here for multi-threaded purposes.

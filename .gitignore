@@ -3,3 +3,4 @@
 /interfaces
 config.json
 .DS_Store
+/cache

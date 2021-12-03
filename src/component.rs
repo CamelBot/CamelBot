@@ -305,6 +305,7 @@ impl Component {
                             // Put the events in the arc
                             let mut lock = commands.lock().await;
                             lock.append(&mut found_commands);
+                            drop(lock);
                             let mut lock = components.lock().await;
                             lock.get_mut(&id).unwrap().intents = events;
                             drop(lock);
@@ -418,7 +419,10 @@ impl Component {
                         }
                         "update" => {
                             component_cache = cache_components(components.clone()).await;
-                            writer.write(commands::create_packet(commands.lock().await)).await;
+                            let lock = commands.lock().await;
+                            let command_clone = lock.clone();
+                            drop(lock);
+                            writer.write(commands::create_packet(command_clone)).await;
                         }
                         _ => {
                             if component_type == 2 {

@@ -72,6 +72,12 @@ impl Clone for Choice {
 /// Example: https://discord.com/developers/docs/interactions/application-commands#registering-a-command
 /// "There is a global rate limit of 200 application command creates per day, per guild"
 pub async fn save_cache(commands: Vec<Command>) {
+    // Create cache folder if it doesn't exist
+    let cache_path = std::env::var("RUST_BOT_CACHE_PATH").unwrap_or_else(|_| "cache".to_string());
+    let cache_path = std::path::Path::new(&cache_path);
+    if !cache_path.exists() {
+        std::fs::create_dir_all(cache_path).unwrap();
+    }
     let mut file = File::create("cache/commands.json").await.unwrap();
     let json = serde_json::to_string(&commands).unwrap();
     file.write_all(json.as_bytes()).await.unwrap();
@@ -84,7 +90,7 @@ pub async fn load_cache() -> Vec<Command> {
     serde_json::from_str(&contents).unwrap()
 }
 
-pub fn create_packet(commands: tokio::sync::MutexGuard<Vec<Command>>) -> String {
+pub fn create_packet(commands: Vec<Command>) -> String {
     let mut cmds = vec![];
     for i in commands.iter() {
         cmds.push(i.clone());
