@@ -5,7 +5,12 @@
 use commands::Command;
 use config::ComponentConstructor;
 use std::{collections::HashMap, sync::Arc};
-use tokio::{fs::File, sync::Mutex};
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+    sync::{mpsc::UnboundedSender, Mutex},
+};
 
 use crate::{component::Component, packet::Packet};
 
@@ -44,6 +49,10 @@ async fn main() {
         Err(_) => Arc::new(Mutex::new(Vec::new())),
     };
 
+    // Network Arc
+    let network_arc: Arc<Mutex<HashMap<String, UnboundedSender<TcpStream>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+
     // Start componenents
     for i in config.components.iter() {
         create_component(
@@ -51,26 +60,58 @@ async fn main() {
             logger.clone("core".to_string()),
             component_arc.clone(),
             command_arc.clone(),
+            network_arc.clone(),
             config.clone(),
         )
         .await;
     }
 
     if config.tcp {
-        // Start TCP listener
-        // Wait for connection
-        // Get list of TCP components that aren't gucci
-        // Receive key and compare to components
-        // If they match, give the component the client
+        let host = config.host.clone();
+        let port = config.port;
+        let logger = logger.clone("core".to_string());
+        tokio::spawn(async move {
+            // Start TCP listener
+            let listener = match tokio::net::TcpListener::bind(format!("{}:{}", &host, &port)).await
+            {
+                Ok(listener) => listener,
+                Err(e) => {
+                    logger.error(&format!("Failed to start TCP listener: {}", e));
+                    return;
+                }
+            };
+            logger.info(&format!("Listening on {}:{}", host, port));
+            loop {
+                // Wait for connection
+                let (mut socket, _) = listener.accept().await.unwrap();
+                socket.write(b"").await.unwrap();
+                // Read the first line from socket
+                let mut key = "".to_string();
+                loop {
+                    let mut buffer = [1];
+                    let _ = socket.read(&mut buffer).await.unwrap();
+                    let char = buffer[0] as char;
+                    if char == '\n' {
+                        break;
+                    } else {
+                        key.push(char);
+                    }
+                }
+
+                // Compare key to waiting components
+                logger.debug(&format!("Received connection with key {}", key));
+                // If they match, give the component the client
+            }
+        });
     }
 
     // UI loop yeet
     // This is now blocking to stop the program from exiting
-    //ui::ui(component_arc.clone(), command_arc.clone(), config).await;
     ui::tui(
         arc_reactor,
         component_arc.clone(),
         command_arc.clone(),
+        network_arc.clone(),
         config,
     );
 }
@@ -80,6 +121,7 @@ pub async fn create_component(
     logger: ui::Logger,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
+    network_arc: Arc<Mutex<HashMap<String, UnboundedSender<TcpStream>>>>,
     config: config::Config,
 ) {
     if i.network && !config.tcp {
@@ -113,14 +155,17 @@ pub async fn create_component(
     let command = i.command.split(" ").collect::<Vec<&str>>()[0];
     let args = i.command.split(" ").skip(1).collect::<Vec<&str>>();
     let args: Vec<String> = args.iter().map(|x| x.to_string()).collect();
+    let key = i.key.clone();
 
     component::Component::connect(
         i.name.clone(),
         logger.clone(i.name.clone()),
         command.to_string(),
         args,
-        component_arc.clone(),
-        command_arc.clone(),
+        key,
+        component_arc,
+        command_arc,
+        network_arc,
         rx,
     )
     .await;

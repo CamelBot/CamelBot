@@ -11,11 +11,14 @@ use async_trait::async_trait;
 use serde_json;
 use std::{collections::HashMap, process::Stdio, sync::Arc};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    net::tcp::{ReadHalf, WriteHalf},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    net::{
+        tcp::{ReadHalf, WriteHalf},
+        TcpStream,
+    },
     process::{ChildStdin, ChildStdout},
     sync::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
+        mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
         Mutex,
     },
 };
@@ -63,8 +66,10 @@ impl Component {
         logger: ui::Logger,
         command: String,
         args: Vec<String>,
+        key: String,
         components: Arc<Mutex<HashMap<String, Component>>>,
         commands: Arc<Mutex<Vec<Command>>>,
+        network_arc: Arc<Mutex<HashMap<String, UnboundedSender<TcpStream>>>>,
         receiver: UnboundedReceiver<Packet>,
     ) {
         // Get command information
@@ -78,7 +83,51 @@ impl Component {
             let mut receiver = receiver;
             match network {
                 true => {
-                    // TODO
+                    loop {
+                        // Create channel to receive client from listener
+                        let (sender, mut cli_rec) = unbounded_channel();
+                        // Add key to network_arc
+                        let mut network_arc = network_arc.lock().await;
+                        network_arc.insert(key.clone(), sender);
+                        drop(network_arc);
+
+                        // Wait for client
+                        let mut client = cli_rec.recv().await.unwrap();
+
+                        // Take the halves of the client
+                        let (read, write) = client.split();
+
+                        // Run
+                        let (rep, rec) = Component::run(
+                            id.clone(),
+                            logger.clone(logger.id.clone()),
+                            read,
+                            write,
+                            cloned_components.clone(),
+                            commands.clone(),
+                            receiver,
+                        )
+                        .await;
+                        if !rep {
+                            // Remove self from components
+                            let mut components = cloned_components.lock().await;
+                            components.remove(&id);
+                            // Notify other components of the change
+                            for (_, v) in components.iter_mut() {
+                                match v.sender.send(Packet {
+                                    source: id.clone(),
+                                    destination: "".to_string(),
+                                    event: "".to_string(),
+                                    data: "update".to_string(),
+                                    sniffers: vec![],
+                                }) {
+                                    _ => {} // Don't care
+                                }
+                            }
+                            break;
+                        }
+                        receiver = rec;
+                    }
                 }
                 false => {
                     loop {
@@ -489,7 +538,18 @@ pub trait ComponentRead {
 #[async_trait]
 impl ComponentRead for ReadHalf<'_> {
     async fn read(&mut self) -> String {
-        todo!()
+        let mut to_return = "".to_string();
+        loop {
+            let mut buffer = [1];
+            let _ = AsyncReadExt::read(&mut self, &mut buffer).await.unwrap();
+            let char = buffer[0] as char;
+            if char == '\n' {
+                break;
+            } else {
+                to_return.push(char);
+            }
+        }
+        to_return
     }
 }
 #[async_trait]
@@ -507,8 +567,10 @@ pub trait ComponentWrite {
 }
 #[async_trait]
 impl ComponentWrite for WriteHalf<'_> {
-    async fn write(&mut self, _msg: String) {
-        todo!()
+    async fn write(&mut self, msg: String) {
+        AsyncWriteExt::write(&mut self, msg.as_bytes())
+            .await
+            .unwrap();
     }
 }
 #[async_trait]
