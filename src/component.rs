@@ -218,6 +218,10 @@ impl Component {
         loop {
             tokio::select! {
                 msg = reader.read() => {
+                    if msg.len() == 0 {
+                        // Component has exited
+                        return (true, receiver);
+                    }
                     let msg = msg.replace("type_", "type"); // TODO figure out a better way to do this
                     // Attempt to parse msg as JSON
                     let mut msg = match serde_json::from_str::<serde_json::Value>(&msg) {
@@ -547,6 +551,10 @@ impl ComponentRead for ReadHalf<'_> {
                 break;
             } else {
                 to_return.push(char);
+                if to_return.len() > 10000 {
+                    // We dead bro
+                    return "".to_string();
+                }
             }
         }
         to_return
@@ -568,9 +576,12 @@ pub trait ComponentWrite {
 #[async_trait]
 impl ComponentWrite for WriteHalf<'_> {
     async fn write(&mut self, msg: String) {
+        let msg = msg.replace("type_", "type");
+        let msg = format!("{}\n", msg);
         AsyncWriteExt::write(&mut self, msg.as_bytes())
             .await
             .unwrap();
+        self.flush().await.unwrap();
     }
 }
 #[async_trait]

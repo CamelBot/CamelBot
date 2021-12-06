@@ -70,6 +70,7 @@ async fn main() {
         let host = config.host.clone();
         let port = config.port;
         let logger = logger.clone("core".to_string());
+        let network_arc = network_arc.clone();
         tokio::spawn(async move {
             // Start TCP listener
             let listener = match tokio::net::TcpListener::bind(format!("{}:{}", &host, &port)).await
@@ -99,8 +100,15 @@ async fn main() {
                 }
 
                 // Compare key to waiting components
-                logger.debug(&format!("Received connection with key {}", key));
-                // If they match, give the component the client
+                let lock = network_arc.lock().await;
+                match lock.get(&key) {
+                    Some(sender) => {
+                        let _ = sender.send(socket).unwrap();
+                    }
+                    None => {
+                        logger.warn(&format!("Received connection with unknown key {}", key));
+                    }
+                }
             }
         });
     }

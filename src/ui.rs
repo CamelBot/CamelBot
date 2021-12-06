@@ -232,7 +232,7 @@ fn display_log(siv: &mut Cursive, messages: Vec<String>) {
     siv.pop_layer();
     // Only get the last logs the terminal will fit
     let mut to_print = Vec::new();
-    let screen_y = get_term_size().1 - 2;
+    let screen_y = get_term_size().1 - 5;
     for i in messages {
         to_print.push(i);
         if to_print.len() > screen_y.into() {
