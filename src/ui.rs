@@ -6,6 +6,7 @@ use cursive::theme::{self};
 use cursive::traits::{Boxable, Nameable, Scrollable};
 use cursive::{CursiveExt, With};
 use std::{collections::HashMap, sync::Arc};
+use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
 use cursive::views::{Dialog, EditView, OnEventView, SelectView, TextView};
@@ -73,6 +74,7 @@ pub fn tui(
     logger: Arc<std::sync::Mutex<UI>>,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
+    network_arc: Arc<Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<TcpStream>>>>,
     config: config::Config,
 ) {
     // Create the cursive TUI
@@ -96,7 +98,13 @@ pub fn tui(
     // Set log data
     siv.set_user_data(logger.clone());
 
-    let data_pack = (logger.clone(), component_arc, command_arc, config);
+    let data_pack = (
+        logger.clone(),
+        component_arc,
+        command_arc,
+        network_arc,
+        config,
+    );
     let esc_data_pack = data_pack.clone();
     let refresh_data_pack = data_pack.clone();
     let og_data_pack = data_pack.clone();
@@ -117,6 +125,7 @@ pub fn tui(
                     esc_data_pack.1.clone(),
                     esc_data_pack.2.clone(),
                     esc_data_pack.3.clone(),
+                    esc_data_pack.4.clone(),
                 );
             }
             _ => {
@@ -156,6 +165,7 @@ pub fn tui(
                 refresh_data_pack.1.clone(),
                 refresh_data_pack.2.clone(),
                 refresh_data_pack.3.clone(),
+                refresh_data_pack.4.clone(),
             );
         }
     });
@@ -169,6 +179,7 @@ pub fn tui(
         og_data_pack.1.clone(),
         og_data_pack.2.clone(),
         og_data_pack.3.clone(),
+        og_data_pack.4,
     );
     siv.run();
 }
@@ -178,6 +189,7 @@ fn display_menu(
     logger: crate::ui::Logger,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
+    network_arc: Arc<Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<TcpStream>>>>,
     config: config::Config,
 ) {
     siv.pop_layer();
@@ -185,6 +197,7 @@ fn display_menu(
 
     let remove_arc = component_arc.clone();
     let reload_arc = component_arc.clone();
+    let quit_arc = component_arc.clone();
 
     siv.add_layer(
         Dialog::around(Dialog::text(format!(
@@ -202,6 +215,7 @@ fn display_menu(
                 logger.clone("core".to_string()),
                 component_arc.clone(),
                 command_arc.clone(),
+                network_arc.clone(),
                 config.clone(),
             )
         })
@@ -211,7 +225,29 @@ fn display_menu(
         .button("Reload Component", move |s| {
             choose_component_reload(s, reload_arc.clone())
         })
-        .button("Exit", |s| s.quit())
+        .button("Exit", move |s| {
+            // Kill all components
+            let quit_arc = quit_arc.clone();
+            let (tx, rx) = std::sync::mpsc::channel();
+            tokio::spawn(async move {
+                let mut lock = quit_arc.lock().await;
+                for (_, component) in lock.iter_mut() {
+                    component.kill().await;
+                }
+                tx.send(()).unwrap();
+            });
+            // Add killing popup
+            s.add_layer(
+                Dialog::around(Dialog::text("Killing components..."))
+                    .title("CamelBot Menu")
+                    .button("Ok", |s| {
+                        s.pop_layer();
+                    }),
+            );
+            // Wait for components to die
+            rx.recv().unwrap();
+            s.quit();
+        })
         .fixed_size((x_size, y_size)),
     );
 }
@@ -219,7 +255,7 @@ fn display_log(siv: &mut Cursive, messages: Vec<String>) {
     siv.pop_layer();
     // Only get the last logs the terminal will fit
     let mut to_print = Vec::new();
-    let screen_y = get_term_size().1 - 2;
+    let screen_y = get_term_size().1 - 5;
     for i in messages {
         to_print.push(i);
         if to_print.len() > screen_y.into() {
@@ -240,6 +276,7 @@ fn choose_component_type(
     logger: crate::ui::Logger,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
+    network_arc: Arc<Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<TcpStream>>>>,
     config: config::Config,
 ) {
     siv.pop_layer();
@@ -247,12 +284,14 @@ fn choose_component_type(
         logger.clone("core".to_string()),
         component_arc.clone(),
         command_arc.clone(),
+        network_arc.clone(),
         config.clone(),
     );
     let pack2 = (
         logger.clone("core".to_string()),
         component_arc.clone(),
         command_arc.clone(),
+        network_arc.clone(),
         config.clone(),
     );
     siv.add_layer(
@@ -266,6 +305,7 @@ fn choose_component_type(
                     pack1.1.clone(),
                     pack1.2.clone(),
                     pack1.3.clone(),
+                    pack1.4.clone(),
                 )
             })
             .button("Plugin", move |s| {
@@ -276,6 +316,7 @@ fn choose_component_type(
                     pack2.1.clone(),
                     pack2.2.clone(),
                     pack2.3.clone(),
+                    pack2.4.clone(),
                 )
             })
             .button("Sniffer", move |s| {
@@ -285,6 +326,7 @@ fn choose_component_type(
                     logger.clone("core".to_string()),
                     component_arc.clone(),
                     command_arc.clone(),
+                    network_arc.clone(),
                     config.clone(),
                 )
             }),
@@ -297,12 +339,14 @@ fn choose_name(
     logger: crate::ui::Logger,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
+    network_arc: Arc<Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<TcpStream>>>>,
     config: config::Config,
 ) {
     let pack = (
         logger.clone("core".to_string()),
         component_arc.clone(),
         command_arc.clone(),
+        network_arc.clone(),
         config.clone(),
     );
     siv.pop_layer();
@@ -323,6 +367,7 @@ fn choose_name(
                             pack.1.clone(),
                             pack.2.clone(),
                             pack.3.clone(),
+                            pack.4.clone(),
                         )
                     })
                     // Give the `EditView` a name so we can refer to it later.
@@ -350,6 +395,7 @@ fn choose_name(
                     logger.clone("core".to_string()),
                     component_arc.clone(),
                     command_arc.clone(),
+                    network_arc.clone(),
                     config.clone(),
                 );
             }),
@@ -363,6 +409,7 @@ fn choose_command(
     logger: crate::ui::Logger,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
+    network_arc: Arc<Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<TcpStream>>>>,
     config: config::Config,
 ) {
     siv.pop_layer();
@@ -371,6 +418,7 @@ fn choose_command(
         logger.clone("core".to_string()),
         component_arc.clone(),
         command_arc.clone(),
+        network_arc.clone(),
         config.clone(),
     );
     siv.add_layer(
@@ -391,6 +439,7 @@ fn choose_command(
                             pack.2.clone(),
                             pack.3.clone(),
                             pack.4.clone(),
+                            pack.5.clone(),
                         )
                     })
                     // Give the `EditView` a name so we can refer to it later.
@@ -419,6 +468,7 @@ fn choose_command(
                     logger.clone("core".to_string()),
                     component_arc.clone(),
                     command_arc.clone(),
+                    network_arc.clone(),
                     config.clone(),
                 );
             }),
@@ -433,6 +483,7 @@ fn collect_component_options(
     logger: crate::ui::Logger,
     component_arc: Arc<Mutex<HashMap<String, Component>>>,
     command_arc: Arc<Mutex<Vec<Command>>>,
+    network_arc: Arc<Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<TcpStream>>>>,
     config: config::Config,
 ) {
     siv.pop_layer();
@@ -447,12 +498,13 @@ fn collect_component_options(
         logger.clone("core".to_string()),
         component_arc.clone(),
         command_arc.clone(),
+        network_arc.clone(),
         config.clone(),
     );
-    tokio::spawn(
-        async move { create_component(&constructor, pack.0, pack.1, pack.2, pack.3).await },
-    );
-    display_menu(siv, logger, component_arc, command_arc, config);
+    tokio::spawn(async move {
+        create_component(&constructor, pack.0, pack.1, pack.2, pack.3, pack.4).await
+    });
+    display_menu(siv, logger, component_arc, command_arc, network_arc, config);
 }
 
 // Component removal functions

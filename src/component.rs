@@ -11,11 +11,14 @@ use async_trait::async_trait;
 use serde_json;
 use std::{collections::HashMap, process::Stdio, sync::Arc};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    net::tcp::{ReadHalf, WriteHalf},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    net::{
+        tcp::{ReadHalf, WriteHalf},
+        TcpStream,
+    },
     process::{ChildStdin, ChildStdout},
     sync::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
+        mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
         Mutex,
     },
 };
@@ -63,8 +66,10 @@ impl Component {
         logger: ui::Logger,
         command: String,
         args: Vec<String>,
+        key: String,
         components: Arc<Mutex<HashMap<String, Component>>>,
         commands: Arc<Mutex<Vec<Command>>>,
+        network_arc: Arc<Mutex<HashMap<String, UnboundedSender<TcpStream>>>>,
         receiver: UnboundedReceiver<Packet>,
     ) {
         // Get command information
@@ -78,7 +83,51 @@ impl Component {
             let mut receiver = receiver;
             match network {
                 true => {
-                    // TODO
+                    loop {
+                        // Create channel to receive client from listener
+                        let (sender, mut cli_rec) = unbounded_channel();
+                        // Add key to network_arc
+                        let mut network_arc = network_arc.lock().await;
+                        network_arc.insert(key.clone(), sender);
+                        drop(network_arc);
+
+                        // Wait for client
+                        let mut client = cli_rec.recv().await.unwrap();
+
+                        // Take the halves of the client
+                        let (read, write) = client.split();
+
+                        // Run
+                        let (rep, rec) = Component::run(
+                            id.clone(),
+                            logger.clone(logger.id.clone()),
+                            read,
+                            write,
+                            cloned_components.clone(),
+                            commands.clone(),
+                            receiver,
+                        )
+                        .await;
+                        if !rep {
+                            // Remove self from components
+                            let mut components = cloned_components.lock().await;
+                            components.remove(&id);
+                            // Notify other components of the change
+                            for (_, v) in components.iter_mut() {
+                                match v.sender.send(Packet {
+                                    source: id.clone(),
+                                    destination: "".to_string(),
+                                    event: "".to_string(),
+                                    data: "update".to_string(),
+                                    sniffers: vec![],
+                                }) {
+                                    _ => {} // Don't care
+                                }
+                            }
+                            break;
+                        }
+                        receiver = rec;
+                    }
                 }
                 false => {
                     loop {
@@ -169,6 +218,10 @@ impl Component {
         loop {
             tokio::select! {
                 msg = reader.read() => {
+                    if msg.len() == 0 {
+                        // Component has exited
+                        return (true, receiver);
+                    }
                     let msg = msg.replace("type_", "type"); // TODO figure out a better way to do this
                     // Attempt to parse msg as JSON
                     let mut msg = match serde_json::from_str::<serde_json::Value>(&msg) {
@@ -305,6 +358,7 @@ impl Component {
                             // Put the events in the arc
                             let mut lock = commands.lock().await;
                             lock.append(&mut found_commands);
+                            drop(lock);
                             let mut lock = components.lock().await;
                             lock.get_mut(&id).unwrap().intents = events;
                             drop(lock);
@@ -418,7 +472,10 @@ impl Component {
                         }
                         "update" => {
                             component_cache = cache_components(components.clone()).await;
-                            writer.write(commands::create_packet(commands.lock().await)).await;
+                            let lock = commands.lock().await;
+                            let command_clone = lock.clone();
+                            drop(lock);
+                            writer.write(commands::create_packet(command_clone)).await;
                         }
                         _ => {
                             if component_type == 2 {
@@ -448,6 +505,17 @@ impl Component {
 
                 }
             }
+        }
+    }
+    pub async fn kill(&self) {
+        match self.sender.send(Packet {
+            source: "".to_string(),
+            destination: "".to_string(),
+            event: "".to_string(),
+            data: "kill".to_string(),
+            sniffers: vec![],
+        }) {
+            _ => {} // Don't care
         }
     }
 }
@@ -485,7 +553,22 @@ pub trait ComponentRead {
 #[async_trait]
 impl ComponentRead for ReadHalf<'_> {
     async fn read(&mut self) -> String {
-        todo!()
+        let mut to_return = "".to_string();
+        loop {
+            let mut buffer = [1];
+            let _ = AsyncReadExt::read(&mut self, &mut buffer).await.unwrap();
+            let char = buffer[0] as char;
+            if char == '\n' {
+                break;
+            } else {
+                to_return.push(char);
+                if to_return.len() > 10000 {
+                    // We dead bro
+                    return "".to_string();
+                }
+            }
+        }
+        to_return
     }
 }
 #[async_trait]
@@ -503,8 +586,13 @@ pub trait ComponentWrite {
 }
 #[async_trait]
 impl ComponentWrite for WriteHalf<'_> {
-    async fn write(&mut self, _msg: String) {
-        todo!()
+    async fn write(&mut self, msg: String) {
+        let msg = msg.replace("type_", "type");
+        let msg = format!("{}\n", msg);
+        AsyncWriteExt::write(&mut self, msg.as_bytes())
+            .await
+            .unwrap();
+        self.flush().await.unwrap();
     }
 }
 #[async_trait]
