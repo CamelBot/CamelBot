@@ -197,6 +197,7 @@ fn display_menu(
 
     let remove_arc = component_arc.clone();
     let reload_arc = component_arc.clone();
+    let quit_arc = component_arc.clone();
 
     siv.add_layer(
         Dialog::around(Dialog::text(format!(
@@ -224,7 +225,29 @@ fn display_menu(
         .button("Reload Component", move |s| {
             choose_component_reload(s, reload_arc.clone())
         })
-        .button("Exit", |s| s.quit())
+        .button("Exit", move |s| {
+            // Kill all components
+            let quit_arc = quit_arc.clone();
+            let (tx, rx) = std::sync::mpsc::channel();
+            tokio::spawn(async move {
+                let mut lock = quit_arc.lock().await;
+                for (_, component) in lock.iter_mut() {
+                    component.kill().await;
+                }
+                tx.send(()).unwrap();
+            });
+            // Add killing popup
+            s.add_layer(
+                Dialog::around(Dialog::text("Killing components..."))
+                    .title("CamelBot Menu")
+                    .button("Ok", |s| {
+                        s.pop_layer();
+                    }),
+            );
+            // Wait for components to die
+            rx.recv().unwrap();
+            s.quit();
+        })
         .fixed_size((x_size, y_size)),
     );
 }

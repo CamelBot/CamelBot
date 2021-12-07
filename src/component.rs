@@ -507,6 +507,17 @@ impl Component {
             }
         }
     }
+    pub async fn kill(&self) {
+        match self.sender.send(Packet {
+            source: "".to_string(),
+            destination: "".to_string(),
+            event: "".to_string(),
+            data: "kill".to_string(),
+            sniffers: vec![],
+        }) {
+            _ => {} // Don't care
+        }
+    }
 }
 
 impl Clone for Component {
