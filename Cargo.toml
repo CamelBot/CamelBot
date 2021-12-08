@@ -6,7 +6,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "*", features = ["rt-multi-thread", "io-util", "sync", "macros", "process", "net", "fs", "rt", "time"] }
+tokio = { version = "*", features = ["rt-multi-thread", "io-util", "sync", "macros", "process", "net", "fs", "rt"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = { version = "*" }
 dialoguer = { version = "*" }
