@@ -75,7 +75,13 @@ impl Component {
         // Get command information
         let cloned_components = components.clone();
         let mut components = components.lock().await;
-        let component = components.get_mut(&id).unwrap();
+        let component = match components.get_mut(&id) {
+            Some(component) => component,
+            None => {
+                logger.error(&format!("Component {} not found. This is an unknown CamelBot error and your component will probably crash/not work. Have a nice day!", id));
+                return;
+            }
+        };
         let network = component.network;
         drop(components);
 
@@ -92,7 +98,13 @@ impl Component {
                         drop(network_arc);
 
                         // Wait for client
-                        let mut client = cli_rec.recv().await.unwrap();
+                        let mut client = match cli_rec.recv().await {
+                            Some(client) => client,
+                            None => {
+                                logger.error(&format!("Unable to get client from socket. This is an unknown CamelBot error and your component will probably crash/not work. Have a nice day!"));
+                                return;
+                            }
+                        };
 
                         // Take the halves of the client
                         let (read, write) = client.split();
@@ -146,8 +158,24 @@ impl Component {
                             }
                         };
 
-                        let stdin = cmd.stdin.take().unwrap();
-                        let stdout = cmd.stdout.take().unwrap();
+                        let stdin = match cmd.stdin.take() {
+                            Some(stdin) => stdin,
+                            None => {
+                                logger.error(
+                                    format!("Failed to get stdin from component {}", id).as_str(),
+                                );
+                                return;
+                            }
+                        };
+                        let stdout = match cmd.stdout.take() {
+                            Some(stdout) => stdout,
+                            None => {
+                                logger.error(
+                                    format!("Failed to get stdout from component {}", id).as_str(),
+                                );
+                                return;
+                            }
+                        };
                         let stdout = BufReader::new(stdout);
                         if !Component::run(
                             &mut id,
@@ -177,8 +205,15 @@ impl Component {
                             }
                             break;
                         }
-                        cmd.kill().await.unwrap();
-                        cmd.wait().await.unwrap();
+                        match cmd.kill().await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                logger.error(
+                                    format!("Failed to kill component {}: {}", id, e).as_str(),
+                                );
+                                return;
+                            }
+                        };
                     }
                 }
             }
@@ -236,7 +271,14 @@ impl Component {
                         }
                     };
                     // Add source to msg
-                    msg.as_object_mut().unwrap().insert("source".to_string(), id.clone().into());
+                    match msg.as_object_mut() {
+                        Some(msg) => {
+                            msg.insert("source".to_string(), serde_json::Value::String(id.clone()));
+                        }
+                        None => {
+                            logger.warn("Received a packet that was not in JSON format, could not add source");
+                        }
+                    }
                     let packet_type = match msg["type"].as_str() {
                         Some(type_) => type_,
                         _ => {
@@ -263,8 +305,29 @@ impl Component {
                             if sniffers.len() > 0 {
                                 // Send packet to the first sniffer
                                 let sniffer = sniffers.remove(0);
-                                match component_cache.get_mut(&sniffer).unwrap().sender.send(to_send) {
-                                    _ => {} // Don't care
+                                match component_cache.get_mut(&sniffer) {
+                                    Some(sniffer) => {
+                                        match sniffer.sender.send(to_send.clone()) {
+                                            Ok(_) => {}
+                                            Err(e) => {
+                                                logger.error(
+                                                    format!(
+                                                        "Failed to send packet to sniffer {}: {}",
+                                                        sniffer.id, e
+                                                    ).as_str(),
+                                                );
+                                            }
+                                        }
+                                    }
+                                    None => {
+                                        logger.error(
+                                            format!(
+                                                "Failed to send packet to sniffer {}: {}",
+                                                sniffer, "sniffer not found"
+                                            ).as_str(),
+                                        );
+                                    }
+
                                 }
                             } else {
                                 // Broadcast the event to all components that want it
@@ -272,7 +335,14 @@ impl Component {
                                     if k.id.as_str() == id {
                                         continue;
                                     }
-                                    if k.intents.contains(&msg["event"].as_str().unwrap().to_string()) {
+                                    let event = match msg["event"].as_str() {
+                                        Some(event) => event.to_string(),
+                                        _ => {
+                                            logger.warn("Received a packet that has no event");
+                                            continue;
+                                        }
+                                    };
+                                    if k.intents.contains(&event) {
                                         match k.sender.send(to_send.clone()) {
                                             Ok(_) => {},
                                             Err(e) => {
@@ -310,15 +380,29 @@ impl Component {
                             if sniffers.len() > 0 {
                                 // Send packet to the first sniffer
                                 let sniffer = sniffers.remove(0);
-                                match component_cache.get_mut(&sniffer).unwrap().sender.send(to_send) {
-                                    _ => {} // Don't care
+                                match component_cache.get_mut(&sniffer) {
+                                    Some(sniffer) => {
+                                        match sniffer.sender.send(to_send) {
+                                            _ => {} // Don't care
+                                        }
+                                    }
+                                    None => {
+                                        logger.warn("Sniffer does not contain self, this should not happen");
+                                    }
                                 }
                             } else {
                                 // Send the packet to the destination
-                                match component_cache.get_mut(destination).unwrap().sender.send(to_send) {
-                                    Ok(_) => {},
-                                    Err(e) => {
-                                        logger.error(format!("Failed to send packet to {}: {}", destination, e).as_str());
+                                match component_cache.get_mut(destination) {
+                                    Some(destination) => {
+                                        match destination.sender.send(to_send) {
+                                            Ok(_) => {},
+                                            Err(e) => {
+                                                logger.error(format!("Failed to send packet to {}: {}", destination.id, e).as_str());
+                                            }
+                                        }
+                                    }
+                                    None => {
+                                        logger.warn("Packet has bad destination");
                                     }
                                 }
                             }
@@ -336,7 +420,13 @@ impl Component {
                                 Some(events) => {
                                     let mut to_return: Vec<String> = vec![];
                                     for event in events {
-                                        to_return.push(event.as_str().unwrap().to_string());
+                                        to_return.push(match event.as_str() {
+                                            Some(event) => event.to_string(),
+                                            _ => {
+                                                logger.error("Received a packet that has an event that is not a string");
+                                                continue;
+                                            }
+                                        });
                                     }
                                     to_return
                                 }
@@ -368,7 +458,14 @@ impl Component {
                             lock.append(&mut found_commands);
                             drop(lock);
                             let mut lock = components.lock().await;
-                            lock.get_mut(id).unwrap().intents = events;
+                            match lock.get_mut(id) {
+                                Some(component) => {
+                                    component.intents = events;
+                                }
+                                None => {
+                                    logger.error("Received intents for a component that does not exist");
+                                }
+                            }
                             drop(lock);
                             // Send an update packet to each component
                             for (_, v) in component_cache.iter_mut() {
@@ -394,9 +491,14 @@ impl Component {
                                 }
                             };
 
-
                             // Get self from the cache
-                            let component = component_cache.get_mut(id).unwrap().clone();
+                            let component = match component_cache.get_mut(id) {
+                                Some(component) => component.clone(),
+                                None => {
+                                    logger.error("Received an id for a component that does not exist");
+                                    continue;
+                                }
+                            };
                             // Remove self from the cache
                             let mut lock = components.lock().await;
                             lock.remove(id);
@@ -490,7 +592,12 @@ impl Component {
                                 // We do be a sniffer
                                 let mut sniffers = packet.sniffers.clone();
                                 // Remove self from sniffers
-                                let index = sniffers.iter().position(|x| x == id).unwrap();
+                                let index = match sniffers.iter().position(|x| x == id) {
+                                    Some(index) => index,
+                                    None => {
+                                        continue;
+                                    }
+                                };
                                 sniffers.remove(index);
 
                                 let to_send = crate::packet::SnifferPacket {
@@ -502,7 +609,14 @@ impl Component {
                                     packet: packet.data,
                                 };
                                 // Convert to JSON
-                                let to_send = serde_json::to_string(&to_send).unwrap();
+                                let to_send = match serde_json::to_string(&to_send) {
+                                    Ok(value) => value,
+                                    _ => {
+                                        logger.warn("Failed to convert to JSON");
+                                        continue;
+                                    }
+                                };
+
                                 writer.write(to_send).await;
 
                             } else{
@@ -588,7 +702,12 @@ impl ComponentRead for ReadHalf<'_> {
 impl ComponentRead for BufReader<ChildStdout> {
     async fn read(&mut self) -> String {
         let mut buf = String::new();
-        self.read_line(&mut buf).await.unwrap();
+        match self.read_line(&mut buf).await {
+            Ok(_) => {}
+            Err(_) => {
+                return "".to_string();
+            }
+        }
         buf
     }
 }
@@ -602,10 +721,18 @@ impl ComponentWrite for WriteHalf<'_> {
     async fn write(&mut self, msg: String) {
         let msg = msg.replace("type_", "type");
         let msg = format!("{}\n", msg);
-        AsyncWriteExt::write(&mut self, msg.as_bytes())
-            .await
-            .unwrap();
-        self.flush().await.unwrap();
+        match AsyncWriteExt::write(&mut self, msg.as_bytes()).await {
+            Ok(_) => {}
+            Err(_) => {
+                return;
+            }
+        }
+        match self.flush().await {
+            Ok(_) => {}
+            Err(_) => {
+                return;
+            }
+        }
     }
 }
 #[async_trait]
@@ -613,7 +740,17 @@ impl ComponentWrite for ChildStdin {
     async fn write(&mut self, msg: String) {
         let msg = msg.replace("type_", "type");
         let msg = format!("{}\n", msg);
-        self.write_all(msg.as_bytes()).await.unwrap();
-        self.flush().await.unwrap();
+        match self.write_all(msg.as_bytes()).await {
+            Ok(_) => {}
+            Err(_) => {
+                return;
+            }
+        }
+        match self.flush().await {
+            Ok(_) => {}
+            Err(_) => {
+                return;
+            }
+        }
     }
 }
