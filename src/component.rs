@@ -62,7 +62,7 @@ impl Component {
     }
 
     pub async fn connect(
-        id: String,
+        mut id: String,
         logger: ui::Logger,
         command: String,
         args: Vec<String>,
@@ -98,17 +98,17 @@ impl Component {
                         let (read, write) = client.split();
 
                         // Run
-                        let (rep, rec) = Component::run(
-                            id.clone(),
+                        if !Component::run(
+                            &mut id,
                             logger.clone(logger.id.clone()),
                             read,
                             write,
                             cloned_components.clone(),
                             commands.clone(),
-                            receiver,
+                            &mut receiver,
                         )
-                        .await;
-                        if !rep {
+                        .await
+                        {
                             // Remove self from components
                             let mut components = cloned_components.lock().await;
                             components.remove(&id);
@@ -126,7 +126,6 @@ impl Component {
                             }
                             break;
                         }
-                        receiver = rec;
                     }
                 }
                 false => {
@@ -150,18 +149,17 @@ impl Component {
                         let stdin = cmd.stdin.take().unwrap();
                         let stdout = cmd.stdout.take().unwrap();
                         let stdout = BufReader::new(stdout);
-                        let (rep, rec) = Component::run(
-                            id.clone(),
+                        if !Component::run(
+                            &mut id,
                             logger.clone(logger.id.clone()),
                             stdout,
                             stdin,
                             cloned_components.clone(),
                             commands.clone(),
-                            receiver,
+                            &mut receiver,
                         )
-                        .await;
-                        cmd.kill().await.unwrap();
-                        if !rep {
+                        .await
+                        {
                             // Remove self from components
                             let mut components = cloned_components.lock().await;
                             components.remove(&id);
@@ -179,7 +177,8 @@ impl Component {
                             }
                             break;
                         }
-                        receiver = rec;
+                        cmd.kill().await.unwrap();
+                        cmd.wait().await.unwrap();
                     }
                 }
             }
@@ -196,21 +195,27 @@ impl Component {
     /// # Returns
     /// * `(bool, UnboundedReceiver<Packet>)` - Whether the component should continue running and the receiver to receive packets from other components
     pub async fn run(
-        id: String,
+        id: &mut String,
         logger: ui::Logger,
         reader: impl ComponentRead,
         writer: impl ComponentWrite,
         components: Arc<Mutex<HashMap<String, Component>>>,
         commands: Arc<Mutex<Vec<Command>>>,
-        receiver: UnboundedReceiver<Packet>,
-    ) -> (bool, UnboundedReceiver<Packet>) // Should the component be automatically restarted on exit
+        receiver: &mut UnboundedReceiver<Packet>,
+    ) -> bool // Should the component be automatically restarted on exit
     {
         logger.info(format!("{} has started", id).as_str());
-        let mut id = id;
         let mut reader = reader;
         let mut writer = writer;
-        let mut receiver = receiver;
-        let component_type = components.lock().await.get(&id).unwrap().component_type;
+        let component_type = components
+            .lock()
+            .await
+            .get(id)
+            .unwrap_or_else(|| {
+                logger.error("CamelBot has dropped the component thread due to an ID mismatch. Your component will crash and you will be unable to restart it. Have a nice day!");
+                panic!("stupid CamelBot");
+            })
+            .component_type;
 
         // We are caching components to avoid bottleknecks and unecessary locks
         let mut component_cache = cache_components(components.clone()).await;
@@ -220,7 +225,7 @@ impl Component {
                 msg = reader.read() => {
                     if msg.len() == 0 {
                         // Component has exited
-                        return (true, receiver);
+                        return true;
                     }
                     let msg = msg.replace("type_", "type"); // TODO figure out a better way to do this
                     // Attempt to parse msg as JSON
@@ -264,7 +269,7 @@ impl Component {
                             } else {
                                 // Broadcast the event to all components that want it
                                 for (_, k) in component_cache.iter_mut() {
-                                    if k.id == id {
+                                    if k.id.as_str() == id {
                                         continue;
                                     }
                                     if k.intents.contains(&msg["event"].as_str().unwrap().to_string()) {
@@ -345,7 +350,10 @@ impl Component {
                                     let mut to_return: Vec<Command> = vec![];
                                     for i in cmds {
                                         to_return.push(match serde_json::from_value(i.clone()) {
-                                            Ok(value) => value,
+                                            Ok(value) => Command {
+                                                source: id.clone(),
+                                                structure: value,
+                                            },
                                             _ => {
                                                 continue;
                                             }
@@ -360,7 +368,7 @@ impl Component {
                             lock.append(&mut found_commands);
                             drop(lock);
                             let mut lock = components.lock().await;
-                            lock.get_mut(&id).unwrap().intents = events;
+                            lock.get_mut(id).unwrap().intents = events;
                             drop(lock);
                             // Send an update packet to each component
                             for (_, v) in component_cache.iter_mut() {
@@ -388,13 +396,13 @@ impl Component {
 
 
                             // Get self from the cache
-                            let component = component_cache.get_mut(&id).unwrap().clone();
+                            let component = component_cache.get_mut(id).unwrap().clone();
                             // Remove self from the cache
                             let mut lock = components.lock().await;
-                            lock.remove(&id);
+                            lock.remove(id);
                             // Add self to the cache
                             lock.insert(changed_id.to_string(), component);
-                            id = changed_id.to_string();
+                            *id = changed_id.to_string();
 
                             // Notify all components of the change
                             for (_, v) in component_cache.iter_mut() {
@@ -465,10 +473,10 @@ impl Component {
                     };
                     match packet.data.as_str() {
                         "kill" => {
-                            return(false, receiver);
+                            return false;
                         }
                         "reload" => {
-                            return(true, receiver);
+                            return true;
                         }
                         "update" => {
                             component_cache = cache_components(components.clone()).await;
@@ -482,7 +490,7 @@ impl Component {
                                 // We do be a sniffer
                                 let mut sniffers = packet.sniffers.clone();
                                 // Remove self from sniffers
-                                let index = sniffers.iter().position(|x| x == &id).unwrap();
+                                let index = sniffers.iter().position(|x| x == id).unwrap();
                                 sniffers.remove(index);
 
                                 let to_send = crate::packet::SnifferPacket {
@@ -556,7 +564,12 @@ impl ComponentRead for ReadHalf<'_> {
         let mut to_return = "".to_string();
         loop {
             let mut buffer = [1];
-            let _ = AsyncReadExt::read(&mut self, &mut buffer).await.unwrap();
+            let _ = match AsyncReadExt::read(&mut self, &mut buffer).await {
+                Ok(n) => n,
+                Err(_) => {
+                    return "".to_string();
+                }
+            };
             let char = buffer[0] as char;
             if char == '\n' {
                 break;
