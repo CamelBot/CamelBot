@@ -255,11 +255,20 @@ fn display_log(siv: &mut Cursive, messages: Vec<String>) {
     siv.pop_layer();
     // Only get the last logs the terminal will fit
     let mut to_print = Vec::new();
-    let screen_y = get_term_size().1 - 5;
+    let (screen_x, screen_y) = get_term_size();
+    let screen_y = screen_y - 5;
+    let mut line_wrap = 0;
     for i in messages {
+        // Calculate the line wrap
+        let line_multiplier: usize = &i.len() / usize::from(screen_x);
+        line_wrap += line_multiplier;
+
         to_print.push(i);
         if to_print.len() > screen_y.into() {
             to_print.remove(0);
+            for _ in 0..line_wrap {
+                to_print.remove(0);
+            }
         }
     }
 
