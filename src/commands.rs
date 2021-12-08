@@ -7,8 +7,13 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 
-#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Command {
+    pub structure: CommandStructure,
+    pub source: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CommandStructure {
     pub name: String,
     pub plugin: String,
     pub description: String,
@@ -32,12 +37,21 @@ pub struct Choice {
 #[derive(serde::Serialize)]
 pub struct CommandPacket {
     type_: String,
-    commands: Vec<Command>,
+    commands: Vec<CommandStructure>,
 }
 
 impl Clone for Command {
     fn clone(&self) -> Self {
         Command {
+            structure: self.structure.clone(),
+            source: self.source.clone(),
+        }
+    }
+}
+
+impl Clone for CommandStructure {
+    fn clone(&self) -> Self {
+        CommandStructure {
             name: self.name.clone(),
             plugin: self.plugin.clone(),
             description: self.description.clone(),
@@ -71,12 +85,16 @@ impl Clone for Choice {
 /// This is to prevent interfaces removing commands only to immediately replace them.
 /// Example: https://discord.com/developers/docs/interactions/application-commands#registering-a-command
 /// "There is a global rate limit of 200 application command creates per day, per guild"
-pub async fn save_cache(commands: Vec<Command>) {
+pub async fn save_cache(command_structures: Vec<Command>) {
     // Create cache folder if it doesn't exist
     let cache_path = std::env::var("RUST_BOT_CACHE_PATH").unwrap_or_else(|_| "cache".to_string());
     let cache_path = std::path::Path::new(&cache_path);
     if !cache_path.exists() {
         std::fs::create_dir_all(cache_path).unwrap();
+    }
+    let mut commands = vec![];
+    for i in command_structures {
+        commands.push(i.structure.clone());
     }
     let mut file = File::create("cache/commands.json").await.unwrap();
     let json = serde_json::to_string(&commands).unwrap();
@@ -87,13 +105,21 @@ pub async fn load_cache() -> Vec<Command> {
     let mut file = File::open("cache/commands.json").await.unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).await.unwrap();
-    serde_json::from_str(&contents).unwrap()
+    let command_structures: Vec<CommandStructure> = serde_json::from_str(&contents).unwrap();
+    let mut commands = vec![];
+    for i in command_structures {
+        commands.push(Command {
+            structure: i,
+            source: "cache".to_string(),
+        });
+    }
+    commands
 }
 
 pub fn create_packet(commands: Vec<Command>) -> String {
     let mut cmds = vec![];
     for i in commands.iter() {
-        cmds.push(i.clone());
+        cmds.push(i.structure.clone());
     }
     let json = serde_json::to_string(&CommandPacket {
         type_: "commands".to_string(),
